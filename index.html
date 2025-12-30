@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ROI & Lead Loss Calculator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 900px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            text-align: center;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .input-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 0.95em;
+        }
+
+        .help-text {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 4px;
+            font-weight: normal;
+        }
+
+        input[type="number"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: all 0.3s;
+        }
+
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .input-prefix {
+            position: relative;
+        }
+
+        .input-prefix input {
+            padding-left: 35px;
+        }
+
+        .input-prefix::before {
+            content: '$';
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #666;
+            font-weight: 600;
+        }
+
+        .results {
+            display: none;
+        }
+
+        .results.show {
+            display: block;
+        }
+
+        .result-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+
+        .result-card h2 {
+            font-size: 1.3em;
+            margin-bottom: 20px;
+            opacity: 0.95;
+        }
+
+        .metric {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+
+        .metric:last-child {
+            margin-bottom: 0;
+        }
+
+        .metric-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+            margin-bottom: 8px;
+        }
+
+        .metric-value {
+            font-size: 2em;
+            font-weight: 700;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .metric-description {
+            font-size: 0.85em;
+            opacity: 0.8;
+            margin-top: 5px;
+        }
+
+        .loss-card {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .warning-card {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-box {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.85em;
+            opacity: 0.9;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 1.8em;
+            font-weight: 700;
+        }
+
+        .cta-section {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 30px;
+        }
+
+        .cta-section h3 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+
+        .cta-section p {
+            color: #856404;
+            line-height: 1.6;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .percentage {
+            font-size: 0.6em;
+            opacity: 0.9;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .metric-value {
+                font-size: 1.5em;
+            }
+
+            .stat-value {
+                font-size: 1.4em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💰 ROI & Lead Loss Calculator</h1>
+        <p class="subtitle">Discover how much money you're leaving on the table</p>
+
+        <div class="input-section">
+            <div class="input-group">
+                <label>
+                    Monthly Marketing Budget
+                    <span class="help-text">Total amount spent on marketing and lead generation</span>
+                </label>
+                <div class="input-prefix">
+                    <input type="number" id="marketingBudget" placeholder="10000" min="0" step="100">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label>
+                    Total Leads Generated
+                    <span class="help-text">Number of leads/calls received per month</span>
+                </label>
+                <input type="number" id="totalLeads" placeholder="200" min="0">
+            </div>
+
+            <div class="input-group">
+                <label>
+                    Missed Calls/Leads
+                    <span class="help-text">Number of leads that went unanswered</span>
+                </label>
+                <input type="number" id="missedLeads" placeholder="50" min="0">
+            </div>
+
+            <div class="input-group">
+                <label>
+                    Average Customer Value
+                    <span class="help-text">Average revenue per customer (lifetime or first purchase)</span>
+                </label>
+                <div class="input-prefix">
+                    <input type="number" id="customerValue" placeholder="5000" min="0" step="100">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label>
+                    Lead-to-Customer Conversion Rate (%)
+                    <span class="help-text">Percentage of answered leads that become customers</span>
+                </label>
+                <input type="number" id="conversionRate" placeholder="20" min="0" max="100" step="1">
+            </div>
+
+            <button onclick="calculate()">Calculate Your Losses</button>
+        </div>
+
+        <div id="results" class="results">
+            <div class="result-card loss-card">
+                <h2>💸 Your Monthly Loss from Missed Leads</h2>
+                <div class="metric">
+                    <div class="metric-label">Lost Revenue</div>
+                    <div class="metric-value" id="lostRevenue">$0</div>
+                    <div class="metric-description">Revenue you're losing every month from missed opportunities</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Annual Lost Revenue</div>
+                    <div class="metric-value" id="annualLoss">$0</div>
+                    <div class="metric-description">Projected yearly loss if this continues</div>
+                </div>
+            </div>
+
+            <div class="result-card">
+                <h2>📊 Cost Analysis</h2>
+                <div class="grid">
+                    <div class="stat-box">
+                        <div class="stat-label">Cost Per Lead</div>
+                        <div class="stat-value" id="costPerLead">$0</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Wasted Marketing $</div>
+                        <div class="stat-value" id="wastedMarketing">$0</div>
+                    </div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Marketing Budget Wasted</div>
+                    <div class="metric-value">
+                        <span id="wastedPercentage">0</span><span class="percentage">%</span>
+                    </div>
+                    <div class="metric-description">Percentage of your marketing budget going to waste</div>
+                </div>
+            </div>
+
+            <div class="result-card warning-card">
+                <h2>🎯 Opportunity Cost</h2>
+                <div class="metric">
+                    <div class="metric-label">Potential Customers Lost</div>
+                    <div class="metric-value" id="lostCustomers">0</div>
+                    <div class="metric-description">Number of customers you could have acquired</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Current ROI</div>
+                    <div class="metric-value">
+                        <span id="currentROI">0</span><span class="percentage">%</span>
+                    </div>
+                    <div class="metric-description">Return on your current marketing investment</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Potential ROI (if all leads answered)</div>
+                    <div class="metric-value">
+                        <span id="potentialROI">0</span><span class="percentage">%</span>
+                    </div>
+                    <div class="metric-description">What you could be achieving</div>
+                </div>
+            </div>
+
+            <div class="cta-section">
+                <h3>🚀 The Solution</h3>
+                <p>Every missed call is money down the drain. With a proper call answering system, you could capture these leads and turn them into paying customers. Don't let your marketing dollars go to waste!</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(value);
+        }
+
+        function formatNumber(value) {
+            return new Intl.NumberFormat('en-US', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 1
+            }).format(value);
+        }
+
+        function calculate() {
+            // Get input values
+            const marketingBudget = parseFloat(document.getElementById('marketingBudget').value) || 0;
+            const totalLeads = parseFloat(document.getElementById('totalLeads').value) || 0;
+            const missedLeads = parseFloat(document.getElementById('missedLeads').value) || 0;
+            const customerValue = parseFloat(document.getElementById('customerValue').value) || 0;
+            const conversionRate = parseFloat(document.getElementById('conversionRate').value) || 0;
+
+            // Validate inputs
+            if (marketingBudget === 0 || totalLeads === 0) {
+                alert('Please fill in at least the marketing budget and total leads to calculate results.');
+                return;
+            }
+
+            // Calculate metrics
+            const costPerLead = marketingBudget / totalLeads;
+            const wastedMarketing = costPerLead * missedLeads;
+            const wastedPercentage = (missedLeads / totalLeads) * 100;
+
+            const lostCustomers = (missedLeads * (conversionRate / 100));
+            const lostRevenue = lostCustomers * customerValue;
+            const annualLoss = lostRevenue * 12;
+
+            // Calculate ROI
+            const answeredLeads = totalLeads - missedLeads;
+            const currentCustomers = answeredLeads * (conversionRate / 100);
+            const currentRevenue = currentCustomers * customerValue;
+            const currentROI = ((currentRevenue - marketingBudget) / marketingBudget) * 100;
+
+            const potentialCustomers = totalLeads * (conversionRate / 100);
+            const potentialRevenue = potentialCustomers * customerValue;
+            const potentialROI = ((potentialRevenue - marketingBudget) / marketingBudget) * 100;
+
+            // Update display
+            document.getElementById('lostRevenue').textContent = formatCurrency(lostRevenue);
+            document.getElementById('annualLoss').textContent = formatCurrency(annualLoss);
+            document.getElementById('costPerLead').textContent = formatCurrency(costPerLead);
+            document.getElementById('wastedMarketing').textContent = formatCurrency(wastedMarketing);
+            document.getElementById('wastedPercentage').textContent = formatNumber(wastedPercentage);
+            document.getElementById('lostCustomers').textContent = formatNumber(lostCustomers);
+            document.getElementById('currentROI').textContent = formatNumber(currentROI);
+            document.getElementById('potentialROI').textContent = formatNumber(potentialROI);
+
+            // Show results
+            document.getElementById('results').classList.add('show');
+
+            // Smooth scroll to results
+            document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        // Allow Enter key to trigger calculation
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    calculate();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
