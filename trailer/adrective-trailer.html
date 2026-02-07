@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Adrective.Ai — Autonomous Growth</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #000; overflow: hidden; font-family: 'Inter', -apple-system, sans-serif; cursor: none; }
         canvas { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; }
@@ -281,7 +281,7 @@
 
     // ─── ANIMATED TEXT REVEAL — letter by letter with correct .Ai coloring ───
     function drawTextReveal(text, cx, cy, fontSize, alpha, revealProgress) {
-        gl.font = `300 ${fontSize}px Inter, sans-serif`;
+        gl.font = `700 ${fontSize}px Orbitron, sans-serif`;
         gl.textAlign = 'left';
         gl.textBaseline = 'middle';
         const fullWidth = gl.measureText(text).width;
@@ -309,7 +309,7 @@
                     gl.fillRect(charCx - fontSize*1.2, cy - fontSize*1.2, fontSize*2.4, fontSize*2.4);
                 }
 
-                gl.font = `300 ${fontSize}px Inter, sans-serif`;
+                gl.font = `700 ${fontSize}px Orbitron, sans-serif`;
                 gl.textAlign = 'left';
                 gl.textBaseline = 'middle';
                 // Color everything from the dot onward in red
@@ -598,32 +598,48 @@
 
     // ─── DRAW STATIC NAME — "Adrective.Ai" with .Ai in red, properly positioned ───
     function drawStaticName(cx, cy, fontSize, alpha) {
-        gl.font = `300 ${fontSize}px Inter, sans-serif`;
+        gl.font = `700 ${fontSize}px Orbitron, sans-serif`;
         gl.textAlign = 'left';
         gl.textBaseline = 'middle';
-        const adrW = gl.measureText('Adrective').width;
-        const dotAiW = gl.measureText('.Ai').width;
+        const adrW = gl.measureText('ADRECTIVE').width;
+        const dotAiW = gl.measureText('.AI').width;
         const fullW = adrW + dotAiW;
         const startX = cx - fullW / 2;
 
         // Breathing glow behind text
         const breathe = Math.sin(frame * 0.03) * 0.3 + 0.7;
         const tg = gl.createRadialGradient(cx, cy, 0, cx, cy, fullW * 0.6);
-        tg.addColorStop(0, `rgba(196,30,42,${alpha * 0.04 * breathe})`);
+        tg.addColorStop(0, `rgba(196,30,42,${alpha * 0.06 * breathe})`);
         tg.addColorStop(1, 'rgba(0,0,0,0)');
         gl.fillStyle = tg;
         gl.fillRect(cx - fullW*0.6, cy - fontSize, fullW*1.2, fontSize*2);
 
-        // "Adrective" in white
-        gl.font = `300 ${fontSize}px Inter, sans-serif`;
+        // Subtle scan line through text
+        const scanY = cy - fontSize * 0.5 + ((frame * 0.8) % (fontSize * 1.2));
+        gl.fillStyle = `rgba(196,30,42,${alpha * 0.04 * breathe})`;
+        gl.fillRect(startX - 10, scanY, fullW + 20, 1);
+
+        // "ADRECTIVE" in white
+        gl.font = `700 ${fontSize}px Orbitron, sans-serif`;
         gl.textAlign = 'left';
         gl.textBaseline = 'middle';
         gl.fillStyle = `rgba(245,245,247,${alpha * 0.9})`;
-        gl.fillText('Adrective', startX, cy);
+        gl.fillText('ADRECTIVE', startX, cy);
 
-        // ".Ai" in red
+        // ".AI" in red
         gl.fillStyle = `rgba(196,30,42,${alpha * 0.95})`;
-        gl.fillText('.Ai', startX + adrW, cy);
+        gl.fillText('.AI', startX + adrW, cy);
+
+        // Underline accent
+        const lineY = cy + fontSize * 0.55;
+        const lineW = fullW * 0.6;
+        const lineGrad = gl.createLinearGradient(cx - lineW/2, 0, cx + lineW/2, 0);
+        lineGrad.addColorStop(0, 'rgba(196,30,42,0)');
+        lineGrad.addColorStop(0.3, `rgba(196,30,42,${alpha * 0.3})`);
+        lineGrad.addColorStop(0.7, `rgba(196,30,42,${alpha * 0.3})`);
+        lineGrad.addColorStop(1, 'rgba(196,30,42,0)');
+        gl.fillStyle = lineGrad;
+        gl.fillRect(cx - lineW/2, lineY, lineW, 1);
     }
 
     // ─── HUD TEXT SYSTEM ───
@@ -1843,7 +1859,7 @@
             const fontSize = Math.floor(Math.min(W * 0.055, H * 0.09, 72));
 
             if (textProgress > 0) {
-                drawTextReveal('Adrective.Ai', W/2, H/2, fontSize, textAlpha * a, textProgress);
+                drawTextReveal('ADRECTIVE.AI', W/2, H/2, fontSize, textAlpha * a, textProgress);
             }
 
             // After text is fully revealed — breathing glow under it
@@ -1892,12 +1908,16 @@
             const tagStart = textStart + textDur + 1.5;
             const tagAlpha = fade(lt, tagStart, 1.5) * a;
             if (tagAlpha > 0) {
-                const tagSize = Math.floor(fontSize * 0.3);
-                gl.font = `200 ${tagSize}px Inter, sans-serif`;
+                const tagSize = Math.floor(fontSize * 0.28);
+                gl.font = `500 ${tagSize}px Orbitron, sans-serif`;
                 gl.textAlign = 'center';
                 gl.textBaseline = 'middle';
-                gl.fillStyle = `rgba(245,245,247,${tagAlpha * 0.5})`;
-                gl.fillText('AUTONOMOUS GROWTH. ENGINEERED.', W/2, H/2 + fontSize * 1.0);
+                gl.fillStyle = `rgba(245,245,247,${tagAlpha * 0.45})`;
+                gl.fillText('AUTONOMOUS GROWTH. ENGINEERED.', W/2, H/2 + fontSize * 1.1);
+                // Thin accent line below tagline
+                const tLineW = gl.measureText('AUTONOMOUS GROWTH. ENGINEERED.').width * 0.5;
+                gl.fillStyle = `rgba(196,30,42,${tagAlpha * 0.15})`;
+                gl.fillRect(W/2 - tLineW/2, H/2 + fontSize * 1.1 + tagSize * 0.7, tLineW, 0.5);
             }
 
             drawAliveLayer(t, a * 0.9);
@@ -1924,18 +1944,18 @@
                 drawStaticName(W/2, H/2 - fontSize * 0.3, fontSize, nameA);
 
                 // Tagline beneath
-                const tagSize = Math.floor(fontSize * 0.3);
-                gl.font = `200 ${tagSize}px Inter, sans-serif`;
+                const tagSize = Math.floor(fontSize * 0.28);
+                gl.font = `500 ${tagSize}px Orbitron, sans-serif`;
                 gl.textAlign = 'center';
                 gl.textBaseline = 'middle';
                 gl.fillStyle = `rgba(245,245,247,${nameA * 0.4})`;
-                gl.fillText('AUTONOMOUS GROWTH. ENGINEERED.', W/2, H/2 + fontSize * 0.7);
+                gl.fillText('AUTONOMOUS GROWTH. ENGINEERED.', W/2, H/2 + fontSize * 0.8);
             }
 
             // Founder credit — Jacques Lev
             const creditA = fadeIO(lt, 1.5, 1.5, 3, 1);
             if (creditA > 0) {
-                gl.font = '200 10px Inter, sans-serif';
+                gl.font = '400 10px Orbitron, sans-serif';
                 gl.textAlign = 'center';
                 gl.textBaseline = 'middle';
                 gl.fillStyle = `rgba(150,150,150,${creditA * 0.35})`;
