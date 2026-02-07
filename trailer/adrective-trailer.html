@@ -790,44 +790,126 @@
         }
 
         // ═══════════════════════════════════════════
-        // SCENE 0: AWAKENING — consciousness emerges
+        // SCENE 0: AWAKENING — Ultron singularity, AI wakes up
         // ═══════════════════════════════════════════
         if (scene === 0) {
             const p = sp(t, 0);
             const lt = t - S[0].s;
             const a = fadeIO(p, 0, 0.15, 0.88, 0.12);
 
-            // Hex grid awakens
-            const hexA = fade(lt, 2, 4);
-            drawHexGrid(a * hexA * 0.5, lt * 0.5);
+            // PHASE TIMING:
+            // 0-2s:   Absolute dark → single red spark ignites at center
+            // 2-5s:   Particles rush INWARD like gravity, neural arcs crackle
+            // 5-8s:   Singularity builds, hex grid powers on from center outward
+            // 8-10s:  AWAKENING — shockwave blasts outward, AI is born
 
-            // Scanning line
-            const scanY = (lt * 80) % (H + 100) - 50;
-            drawScanLine(scanY, a * fade(lt, 1, 2));
+            // 1. CENTER SINGULARITY SPARK — the seed of consciousness
+            const sparkBirth = clamp(lt / 2);
+            const sparkPulse = Math.sin(lt * 8) * 0.3 + 0.7;
+            const sparkR = 2 + sparkBirth * 6;
+            gl.beginPath();
+            gl.arc(W/2, H/2, sparkR * sparkPulse, 0, Math.PI * 2);
+            gl.fillStyle = `rgba(196,30,42,${a * sparkBirth * 0.9})`;
+            gl.fill();
+            // Inner white-hot core
+            if (sparkBirth > 0.3) {
+                gl.beginPath();
+                gl.arc(W/2, H/2, sparkR * 0.4 * sparkPulse, 0, Math.PI * 2);
+                gl.fillStyle = `rgba(255,200,200,${a * sparkBirth * 0.5 * sparkPulse})`;
+                gl.fill();
+            }
+            // Spark glow radiating outward
+            const glowSize = 40 + sparkBirth * 120;
+            const sparkGlow = gl.createRadialGradient(W/2, H/2, 0, W/2, H/2, glowSize);
+            sparkGlow.addColorStop(0, `rgba(196,30,42,${a * sparkBirth * 0.18 * sparkPulse})`);
+            sparkGlow.addColorStop(0.4, `rgba(139,26,26,${a * sparkBirth * 0.06})`);
+            sparkGlow.addColorStop(1, 'rgba(0,0,0,0)');
+            gl.fillStyle = sparkGlow;
+            gl.fillRect(0, 0, W, H);
 
-            // Particles field — stirring from stillness
-            const stir = ease(clamp(lt / 6));
+            // 2. PARTICLES RUSH INWARD — gravitational singularity pull
+            const convergePower = clamp((lt - 1.5) / 3);
+            const blastPower = clamp((lt - 8) / 1.5);
             for (let i = 0; i < PN; i++) {
                 const sx = (px[i] * 0.5 + 0.5) * W;
                 const sy = (py[i] * 0.5 + 0.5) * H;
-                px[i] += pvx[i] * stir * 1.5;
-                py[i] += pvy[i] * stir * 1.5;
+                const dist = Math.hypot(px[i], py[i]);
+
+                if (blastPower > 0) {
+                    // BLAST outward at awakening!
+                    const blastDir = dist > 0.01 ? 1 : 0;
+                    px[i] += (px[i] / (dist + 0.01)) * blastPower * 0.025 * blastDir;
+                    py[i] += (py[i] / (dist + 0.01)) * blastPower * 0.025 * blastDir;
+                } else {
+                    // Pull toward center
+                    const pullStr = convergePower * 0.006 / (dist + 0.15);
+                    px[i] += -px[i] * pullStr + pvx[i] * (1 - convergePower * 0.8);
+                    py[i] += -py[i] * pullStr + pvy[i] * (1 - convergePower * 0.8);
+                }
                 if(px[i]>1.1) px[i]=-1.1; if(px[i]<-1.1) px[i]=1.1;
                 if(py[i]>1.1) py[i]=-1.1; if(py[i]<-1.1) py[i]=1.1;
 
-                const pulse = Math.sin(lt * 2 + pph[i]) * 0.5 + 0.5;
                 const distCenter = Math.hypot(sx - W/2, sy - H/2) / (W * 0.4);
-                const vis = (1 - distCenter * 0.5) * stir;
+                const pulse = Math.sin(lt * 3 + pph[i]) * 0.5 + 0.5;
+                const vis = convergePower > 0.3
+                    ? Math.max(0, 1 - distCenter * 0.3) * (0.5 + pulse * 0.5)
+                    : Math.max(0, 1 - distCenter) * pulse * convergePower;
 
                 gl.beginPath();
                 gl.arc(sx, sy, psz[i] * (0.5 + pulse * 0.5), 0, Math.PI * 2);
-                gl.fillStyle = i % 12 === 0
-                    ? `rgba(196,30,42,${a * vis * 0.4})`
+                gl.fillStyle = i % 8 === 0
+                    ? `rgba(196,30,42,${a * vis * 0.5})`
                     : `rgba(245,245,247,${a * pa[i] * vis})`;
                 gl.fill();
+
+                // Speed trails for converging particles
+                if (convergePower > 0.2 && dist < 0.8 && blastPower === 0) {
+                    const trailLen = convergePower * 12;
+                    gl.beginPath();
+                    gl.moveTo(sx, sy);
+                    gl.lineTo(sx + px[i] * trailLen * W * 0.5, sy + py[i] * trailLen * H * 0.5);
+                    gl.strokeStyle = `rgba(196,30,42,${a * vis * 0.15})`;
+                    gl.lineWidth = 0.3;
+                    gl.stroke();
+                }
             }
 
-            // Neural connections forming
+            // 3. ELECTRIC ARCS — consciousness crackling outward from singularity
+            const arcPhase = clamp((lt - 2) / 3);
+            if (arcPhase > 0) {
+                const arcCount = Math.floor(arcPhase * 12);
+                for (let i = 0; i < arcCount; i++) {
+                    const angle = (lt * 0.5 + i * Math.PI * 2 / 12);
+                    const len = 50 + arcPhase * 200 + Math.sin(lt * 5 + i * 3) * 60;
+                    const segments = 6;
+                    gl.beginPath();
+                    gl.moveTo(W/2, H/2);
+                    for (let s = 1; s <= segments; s++) {
+                        const st = s / segments;
+                        const jitterX = Math.sin(lt * 15 + i * 7 + s * 3) * (25 * st);
+                        const jitterY = Math.cos(lt * 13 + i * 5 + s * 4) * (25 * st);
+                        gl.lineTo(
+                            W/2 + Math.cos(angle) * len * st + jitterX,
+                            H/2 + Math.sin(angle) * len * st + jitterY
+                        );
+                    }
+                    const arcFlicker = Math.sin(lt * 12 + i * 4) * 0.5 + 0.5;
+                    gl.strokeStyle = `rgba(196,30,42,${a * arcPhase * 0.35 * arcFlicker})`;
+                    gl.lineWidth = 0.5 + arcPhase * 1.5 * arcFlicker;
+                    gl.stroke();
+
+                    // Spark at arc tip
+                    if (arcFlicker > 0.6) {
+                        const tipX = W/2 + Math.cos(angle) * len;
+                        const tipY = H/2 + Math.sin(angle) * len;
+                        gl.beginPath(); gl.arc(tipX, tipY, 2 + arcFlicker * 2, 0, Math.PI*2);
+                        gl.fillStyle = `rgba(196,30,42,${a * arcPhase * 0.4})`;
+                        gl.fill();
+                    }
+                }
+            }
+
+            // 4. NEURAL CONNECTIONS snapping in from center
             const connA = fade(lt, 3, 4);
             if (connA > 0) {
                 for (let i = 0; i < NN; i++) {
@@ -844,35 +926,89 @@
                     if (curD > 0.3) continue;
                     const la = (1 - curD / 0.3) * connA * a;
                     gl.beginPath(); gl.moveTo(x1, y1); gl.lineTo(x2, y2);
-                    gl.strokeStyle = `rgba(196,30,42,${la * 0.25})`;
-                    gl.lineWidth = 0.5;
+                    gl.strokeStyle = `rgba(196,30,42,${la * 0.3})`;
+                    gl.lineWidth = 0.5 + connA * 0.5;
                     gl.stroke();
                 }
                 for (let i = 0; i < NN; i++) {
                     const x = (nx[i]*.5+.5)*W, y = (ny[i]*.5+.5)*H;
-                    const pulse = Math.sin(lt * 3 + i) * 0.5 + 0.5;
-                    gl.beginPath(); gl.arc(x, y, 2 + pulse * 2, 0, Math.PI*2);
-                    gl.fillStyle = `rgba(196,30,42,${connA * a * (0.3 + pulse * 0.4)})`;
+                    const pulse = Math.sin(lt * 4 + i) * 0.5 + 0.5;
+                    const r = 2 + pulse * 2.5;
+                    gl.beginPath(); gl.arc(x, y, r, 0, Math.PI*2);
+                    gl.fillStyle = `rgba(196,30,42,${connA * a * (0.4 + pulse * 0.5)})`;
                     gl.fill();
+                    // Neuron glow
+                    const ng = gl.createRadialGradient(x, y, 0, x, y, r * 4);
+                    ng.addColorStop(0, `rgba(196,30,42,${connA * a * pulse * 0.08})`);
+                    ng.addColorStop(1, 'rgba(196,30,42,0)');
+                    gl.fillStyle = ng;
+                    gl.fillRect(x - r*4, y - r*4, r*8, r*8);
                 }
             }
 
-            // Center consciousness glow
-            const cGlow = fade(lt, 4, 3);
-            if (cGlow > 0) {
-                const gr = gl.createRadialGradient(W/2,H/2,0,W/2,H/2,200*cGlow);
-                gr.addColorStop(0, `rgba(196,30,42,${cGlow * a * 0.12})`);
-                gr.addColorStop(1, 'rgba(196,30,42,0)');
-                gl.fillStyle = gr;
-                gl.fillRect(0,0,W,H);
+            // 5. HEX GRID powers on from center outward
+            const hexPhase = fade(lt, 4, 4);
+            if (hexPhase > 0) {
+                drawHexGrid(a * hexPhase * 0.5, lt * 0.5);
             }
 
-            // ALIVE LAYER
+            // 6. Scanning line starts after spark
+            if (lt > 2) {
+                const scanY = ((lt - 2) * 100) % (H + 100) - 50;
+                drawScanLine(scanY, a * fade(lt, 2, 2));
+            }
+
+            // 7. SINGULARITY GLOW — builds massively over time
+            const singGlow = clamp(lt / 6);
+            const singPulse = Math.sin(lt * 2) * 0.2 + 0.8;
+            const singR = 100 + singGlow * 250;
+            const gr = gl.createRadialGradient(W/2, H/2, 0, W/2, H/2, singR);
+            gr.addColorStop(0, `rgba(196,30,42,${singGlow * a * 0.15 * singPulse})`);
+            gr.addColorStop(0.3, `rgba(139,26,26,${singGlow * a * 0.06 * singPulse})`);
+            gr.addColorStop(1, 'rgba(0,0,0,0)');
+            gl.fillStyle = gr;
+            gl.fillRect(0, 0, W, H);
+
+            // 8. AWAKENING SHOCKWAVE at ~8s — the moment Ultron opens its eyes
+            const shockTime = lt - 8;
+            if (shockTime > 0 && shockTime < 2) {
+                const shockA = 1 - shockTime / 2;
+                // Primary shockwave ring
+                const shockR = shockTime * W * 0.4;
+                gl.beginPath();
+                gl.arc(W/2, H/2, shockR, 0, Math.PI * 2);
+                gl.strokeStyle = `rgba(196,30,42,${a * shockA * 0.5})`;
+                gl.lineWidth = 3 * shockA;
+                gl.stroke();
+                // Secondary ring
+                if (shockTime > 0.08) {
+                    gl.beginPath();
+                    gl.arc(W/2, H/2, shockR * 0.65, 0, Math.PI * 2);
+                    gl.strokeStyle = `rgba(196,30,42,${a * shockA * 0.25})`;
+                    gl.lineWidth = 2 * shockA;
+                    gl.stroke();
+                }
+                // Third ring
+                if (shockTime > 0.15) {
+                    gl.beginPath();
+                    gl.arc(W/2, H/2, shockR * 0.35, 0, Math.PI * 2);
+                    gl.strokeStyle = `rgba(245,245,247,${a * shockA * 0.12})`;
+                    gl.lineWidth = 1;
+                    gl.stroke();
+                }
+                // Screen flash at moment of awakening
+                if (shockTime < 0.25) {
+                    const flashA = (1 - shockTime / 0.25);
+                    gl.fillStyle = `rgba(196,30,42,${a * flashA * 0.1})`;
+                    gl.fillRect(0, 0, W, H);
+                }
+            }
+
             drawAliveLayer(t, a * fade(lt, 1, 3));
         }
 
         // ═══════════════════════════════════════════
-        // SCENE 1: RECEPTION — Voice AI answering
+        // SCENE 1: RECEPTION — Voice AI answering calls
         // ═══════════════════════════════════════════
         else if (scene === 1) {
             const p = sp(t, 1);
@@ -881,24 +1017,97 @@
 
             drawHexGrid(a * 0.3, lt * 0.3);
 
+            // VOICE CORE — pulsing orb at center that voice emanates from
+            const corePulse = Math.sin(lt * 4) * 0.3 + 0.7;
+            const coreBreathe = Math.sin(lt * 1.5) * 0.15 + 0.85;
+            const coreR = 14 + corePulse * 8;
+            gl.beginPath();
+            gl.arc(W/2, H/2, coreR, 0, Math.PI * 2);
+            gl.fillStyle = `rgba(196,30,42,${a * corePulse * 0.6})`;
+            gl.fill();
+            // Core inner hot-spot
+            gl.beginPath();
+            gl.arc(W/2, H/2, coreR * 0.45, 0, Math.PI * 2);
+            gl.fillStyle = `rgba(255,220,220,${a * corePulse * 0.25})`;
+            gl.fill();
+            // Core glow field
+            const coreGlow = gl.createRadialGradient(W/2, H/2, 0, W/2, H/2, 100);
+            coreGlow.addColorStop(0, `rgba(196,30,42,${a * 0.12 * corePulse})`);
+            coreGlow.addColorStop(1, 'rgba(0,0,0,0)');
+            gl.fillStyle = coreGlow;
+            gl.fillRect(W/2 - 100, H/2 - 100, 200, 200);
+
+            // CIRCULAR SPECTRUM ANALYZER — radial frequency bars around core
+            const specBars = 48;
+            const specFade = fade(lt, 0.3, 1.5);
+            for (let i = 0; i < specBars; i++) {
+                const angle = (i / specBars) * Math.PI * 2 - Math.PI / 2;
+                // Multi-frequency simulated amplitude
+                const freq = Math.sin(lt * 3 + i * 0.5) * 0.4 +
+                             Math.sin(lt * 5.3 + i * 1.2) * 0.3 +
+                             Math.sin(lt * 7.1 + i * 0.3) * 0.2 +
+                             Math.sin(lt * 11 + i * 0.8) * 0.1;
+                const amp = Math.abs(freq);
+                const barLen = 20 + amp * 90;
+                const innerR = coreR + 18;
+                const x1 = W/2 + Math.cos(angle) * innerR;
+                const y1 = H/2 + Math.sin(angle) * innerR;
+                const x2 = W/2 + Math.cos(angle) * (innerR + barLen);
+                const y2 = H/2 + Math.sin(angle) * (innerR + barLen);
+
+                gl.beginPath(); gl.moveTo(x1, y1); gl.lineTo(x2, y2);
+                gl.strokeStyle = amp > 0.5
+                    ? `rgba(196,30,42,${a * amp * 0.6 * specFade})`
+                    : `rgba(245,245,247,${a * amp * 0.25 * specFade})`;
+                gl.lineWidth = 2;
+                gl.stroke();
+
+                // Bright tip dot on tall bars
+                if (amp > 0.4) {
+                    gl.beginPath();
+                    gl.arc(x2, y2, 1.5, 0, Math.PI * 2);
+                    gl.fillStyle = `rgba(196,30,42,${a * amp * 0.5 * specFade})`;
+                    gl.fill();
+                }
+            }
+
+            // Outer ring for the spectrum
+            gl.beginPath();
+            gl.arc(W/2, H/2, coreR + 18, 0, Math.PI * 2);
+            gl.strokeStyle = `rgba(196,30,42,${a * 0.08 * specFade})`;
+            gl.lineWidth = 0.5;
+            gl.stroke();
+
+            // VOICE RIPPLES — concentric rings emanating at voice rhythm
+            const rippleInterval = 1.0;
+            const rippleCount = Math.floor(lt / rippleInterval);
+            for (let i = Math.max(0, rippleCount - 5); i <= rippleCount; i++) {
+                const rippleAge = lt - i * rippleInterval;
+                if (rippleAge < 0 || rippleAge > 3) continue;
+                const rr = rippleAge * 130;
+                const rAlpha = (1 - rippleAge / 3);
+                gl.beginPath();
+                gl.arc(W/2, H/2, rr, 0, Math.PI * 2);
+                gl.strokeStyle = `rgba(196,30,42,${a * rAlpha * 0.15})`;
+                gl.lineWidth = 1.2 * rAlpha;
+                gl.stroke();
+            }
+
+            // FULL-WIDTH WAVEFORM — main voice wave
             const waveIntensity = fade(lt, 0.5, 2);
             drawWaveform(a, lt, waveIntensity);
+            // Ghost trail waveform — slightly delayed echo
+            if (waveIntensity > 0.3) {
+                drawWaveform(a * 0.25, lt - 0.12, waveIntensity * 0.6);
+            }
 
+            // Call processing flow
             const flowAlpha = fade(lt, 1.5, 2);
             const steps = ['DETECT', 'CLASSIFY', 'QUALIFY', 'SCHEDULE', 'CONFIRM'];
             const litSteps = Math.floor(lt * 0.55);
             drawProcessFlow(W*0.1, H*0.78, W*0.8, steps, litSteps, a * flowAlpha);
 
-            const times = ['02:14 AM', '09:37 AM', '03:51 PM', '11:08 PM'];
-            const tIdx = Math.floor(lt * 0.4) % times.length;
-            gl.font = '200 13px Inter, sans-serif';
-            gl.textAlign = 'right';
-            gl.fillStyle = `rgba(196,30,42,${a * 0.35})`;
-            gl.fillText(times[tIdx], W - 40, 40);
-            gl.font = '8px Inter, sans-serif';
-            gl.fillStyle = `rgba(100,100,100,${a * 0.25})`;
-            gl.fillText('SYSTEM ACTIVE', W - 40, 55);
-
+            // Orbiting frequency particles
             for (let i = 0; i < 400; i++) {
                 const px2 = (px[i]*.5+.5)*W, py2 = (py[i]*.5+.5)*H;
                 px[i] += pvx[i] * 0.8;
@@ -910,6 +1119,18 @@
                 gl.fill();
             }
 
+            // Time cycling — always on
+            const times = ['02:14 AM', '09:37 AM', '03:51 PM', '11:08 PM'];
+            const tIdx = Math.floor(lt * 0.4) % times.length;
+            gl.font = '200 13px Inter, sans-serif';
+            gl.textAlign = 'right';
+            gl.fillStyle = `rgba(196,30,42,${a * 0.35})`;
+            gl.fillText(times[tIdx], W - 40, 40);
+            gl.font = '8px Inter, sans-serif';
+            gl.fillStyle = `rgba(100,100,100,${a * 0.25})`;
+            gl.fillText('SYSTEM ACTIVE', W - 40, 55);
+
+            // Call counter
             const callNum = Math.min(14, Math.floor(lt * 1.3));
             gl.font = '200 11px Inter, sans-serif';
             gl.textAlign = 'right';
