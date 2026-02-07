@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adrective.Ai — Autonomous Growth</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #000;
+            overflow: hidden;
+            font-family: 'Inter', -apple-system, 'Helvetica Neue', sans-serif;
+            cursor: none;
+        }
+
+        canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .scene-text {
+            position: absolute;
+            color: #F5F5F7;
+            font-weight: 300;
+            letter-spacing: 0.15em;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 1.2s ease;
+            text-transform: uppercase;
+            font-size: clamp(18px, 2.5vw, 42px);
+        }
+
+        .scene-text.active {
+            opacity: 1;
+        }
+
+        .scene-text.tagline {
+            font-size: clamp(14px, 1.8vw, 28px);
+            font-weight: 200;
+            letter-spacing: 0.25em;
+            margin-top: 20px;
+        }
+
+        .scene-text.sub {
+            font-size: clamp(12px, 1.2vw, 20px);
+            font-weight: 200;
+            letter-spacing: 0.3em;
+            color: #888;
+        }
+
+        .logo-text {
+            font-size: clamp(36px, 5vw, 80px);
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            color: #F5F5F7;
+        }
+
+        .logo-dot {
+            color: #C41E2A;
+        }
+
+        #play-btn {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 100;
+            background: transparent;
+            border: 1px solid rgba(196, 30, 42, 0.6);
+            color: #F5F5F7;
+            font-family: 'Inter', sans-serif;
+            font-weight: 300;
+            font-size: 16px;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            padding: 18px 48px;
+            cursor: pointer;
+            pointer-events: all;
+            transition: all 0.4s ease;
+        }
+
+        #play-btn:hover {
+            background: rgba(196, 30, 42, 0.15);
+            border-color: #C41E2A;
+            box-shadow: 0 0 40px rgba(196, 30, 42, 0.2);
+        }
+
+        #progress-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            height: 2px;
+            background: #C41E2A;
+            z-index: 20;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="overlay"></div>
+    <button id="play-btn">Launch Trailer</button>
+    <div id="progress-bar"></div>
+
+    <script>
+    (() => {
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const overlay = document.getElementById('overlay');
+        const playBtn = document.getElementById('play-btn');
+        const progressBar = document.getElementById('progress-bar');
+
+        let W, H;
+        let playing = false;
+        let startTime = 0;
+        let currentScene = -1;
+        let audioCtx = null;
+
+        const TOTAL_DURATION = 64; // seconds
+
+        const RED = '#C41E2A';
+        const MATTE_RED = '#8B1A1A';
+        const CRIMSON = '#DC143C';
+        const WHITE = '#F5F5F7';
+        const GRAPHITE = '#1C1C1E';
+        const STEEL = '#2C2C2E';
+
+        // Scene definitions: [startTime, endTime]
+        const scenes = [
+            { start: 0,  end: 8,  name: 'signal' },
+            { start: 8,  end: 18, name: 'reception' },
+            { start: 18, end: 28, name: 'outbound' },
+            { start: 28, end: 38, name: 'leadgen' },
+            { start: 38, end: 46, name: 'infrastructure' },
+            { start: 46, end: 52, name: 'control' },
+            { start: 52, end: 58, name: 'logo' },
+            { start: 58, end: 64, name: 'close' }
+        ];
+
+        // Resize
+        function resize() {
+            W = canvas.width = window.innerWidth * window.devicePixelRatio;
+            H = canvas.height = window.innerHeight * window.devicePixelRatio;
+            canvas.style.width = window.innerWidth + 'px';
+            canvas.style.height = window.innerHeight + 'px';
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        }
+        window.addEventListener('resize', () => { resize(); });
+        resize();
+
+        const realW = () => window.innerWidth;
+        const realH = () => window.innerHeight;
+
+        // Easing
+        function easeInOut(t) { return t < 0.5 ? 2*t*t : -1+(4-2*t)*t; }
+        function easeIn(t) { return t*t*t; }
+        function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+
+        // Fade helper
+        function fadeIn(t, start, dur) {
+            if (t < start) return 0;
+            if (t > start + dur) return 1;
+            return easeOut((t - start) / dur);
+        }
+        function fadeOut(t, start, dur) {
+            if (t < start) return 1;
+            if (t > start + dur) return 0;
+            return 1 - easeIn((t - start) / dur);
+        }
+        function fadeInOut(t, inStart, inDur, outStart, outDur) {
+            return Math.min(fadeIn(t, inStart, inDur), fadeOut(t, outStart, outDur));
+        }
+
+        // Particle systems
+        class DataStream {
+            constructor() { this.reset(); }
+            reset() {
+                this.x = -Math.random() * 200;
+                this.y = realH() / 2 + (Math.random() - 0.5) * 4;
+                this.speed = 1.5 + Math.random() * 3;
+                this.size = 1 + Math.random() * 2;
+                this.alpha = 0.3 + Math.random() * 0.7;
+            }
+            update() {
+                this.x += this.speed;
+                if (this.x > realW() + 10) this.reset();
+            }
+            draw(globalAlpha) {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(245, 245, 247, ${this.alpha * globalAlpha})`;
+                ctx.fill();
+            }
+        }
+
+        class FloatingParticle {
+            constructor() { this.reset(true); }
+            reset(initial) {
+                this.x = Math.random() * realW();
+                this.y = initial ? Math.random() * realH() : realH() + 10;
+                this.vx = (Math.random() - 0.5) * 0.3;
+                this.vy = -0.2 - Math.random() * 0.5;
+                this.size = 0.5 + Math.random() * 1.5;
+                this.alpha = 0.1 + Math.random() * 0.3;
+                this.life = 0;
+                this.maxLife = 200 + Math.random() * 400;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life++;
+                if (this.life > this.maxLife || this.y < -10) this.reset(false);
+            }
+            draw(color, globalAlpha) {
+                const lifeRatio = this.life / this.maxLife;
+                const a = this.alpha * (lifeRatio < 0.1 ? lifeRatio / 0.1 : lifeRatio > 0.8 ? (1 - lifeRatio) / 0.2 : 1) * globalAlpha;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = color === 'red'
+                    ? `rgba(196, 30, 42, ${a})`
+                    : `rgba(245, 245, 247, ${a * 0.5})`;
+                ctx.fill();
+            }
+        }
+
+        // Data visualization elements
+        class WaveformBar {
+            constructor(i, total) {
+                this.i = i;
+                this.total = total;
+                this.targetH = 0;
+                this.currentH = 0;
+                this.phase = Math.random() * Math.PI * 2;
+            }
+            update(t) {
+                this.targetH = (Math.sin(t * 3 + this.phase) * 0.5 + 0.5) *
+                    (Math.sin(t * 1.7 + this.i * 0.3) * 0.3 + 0.7) *
+                    (20 + Math.random() * 30);
+                this.currentH += (this.targetH - this.currentH) * 0.1;
+            }
+            draw(x, baseY, alpha, color) {
+                const barW = 3;
+                ctx.fillStyle = color === 'red'
+                    ? `rgba(196, 30, 42, ${alpha})`
+                    : `rgba(245, 245, 247, ${alpha})`;
+                ctx.fillRect(x, baseY - this.currentH / 2, barW, this.currentH);
+            }
+        }
+
+        // Initialize systems
+        const dataStreams = Array.from({ length: 80 }, () => new DataStream());
+        const particles = Array.from({ length: 120 }, () => new FloatingParticle());
+        const waveformBars = Array.from({ length: 48 }, (_, i) => new WaveformBar(i, 48));
+
+        // FlowChart node
+        function drawFlowNode(x, y, text, lit, alpha) {
+            const w = text.length * 8 + 30;
+            const h = 32;
+            ctx.strokeStyle = lit
+                ? `rgba(196, 30, 42, ${alpha})`
+                : `rgba(60, 60, 60, ${alpha * 0.5})`;
+            ctx.lineWidth = lit ? 1.5 : 0.8;
+            ctx.beginPath();
+            ctx.roundRect(x - w/2, y - h/2, w, h, 4);
+            ctx.stroke();
+            if (lit) {
+                ctx.fillStyle = `rgba(196, 30, 42, ${alpha * 0.08})`;
+                ctx.fill();
+            }
+            ctx.fillStyle = lit
+                ? `rgba(245, 245, 247, ${alpha})`
+                : `rgba(120, 120, 120, ${alpha * 0.5})`;
+            ctx.font = `${11}px Inter, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, x, y);
+        }
+
+        function drawFlowArrow(x1, y1, x2, y2, lit, alpha) {
+            ctx.strokeStyle = lit
+                ? `rgba(196, 30, 42, ${alpha * 0.6})`
+                : `rgba(60, 60, 60, ${alpha * 0.3})`;
+            ctx.lineWidth = lit ? 1.2 : 0.6;
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+            // Arrow head
+            if (lit) {
+                const angle = Math.atan2(y2 - y1, x2 - x1);
+                ctx.beginPath();
+                ctx.moveTo(x2, y2);
+                ctx.lineTo(x2 - 6 * Math.cos(angle - 0.4), y2 - 6 * Math.sin(angle - 0.4));
+                ctx.lineTo(x2 - 6 * Math.cos(angle + 0.4), y2 - 6 * Math.sin(angle + 0.4));
+                ctx.closePath();
+                ctx.fillStyle = `rgba(196, 30, 42, ${alpha * 0.6})`;
+                ctx.fill();
+            }
+        }
+
+        // Metric display
+        function drawMetric(x, y, label, value, alpha, highlight) {
+            ctx.font = '11px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = `rgba(150, 150, 150, ${alpha * 0.7})`;
+            ctx.fillText(label, x, y);
+            ctx.font = highlight ? '600 28px Inter, sans-serif' : '500 24px Inter, sans-serif';
+            ctx.fillStyle = highlight
+                ? `rgba(196, 30, 42, ${alpha})`
+                : `rgba(245, 245, 247, ${alpha})`;
+            ctx.fillText(value, x, y + 30);
+        }
+
+        // Bar chart
+        function drawBarChart(x, y, w, h, values, activeIdx, alpha) {
+            const barW = w / values.length - 2;
+            values.forEach((v, i) => {
+                const barH = v * h;
+                const isActive = i <= activeIdx;
+                ctx.fillStyle = isActive
+                    ? `rgba(196, 30, 42, ${alpha * (0.4 + v * 0.6)})`
+                    : `rgba(60, 60, 60, ${alpha * 0.3})`;
+                ctx.fillRect(x + i * (barW + 2), y + h - barH, barW, barH);
+            });
+        }
+
+        // Server LED grid
+        function drawServerGrid(alpha, pulsePhase) {
+            const cols = 12;
+            const rows = 6;
+            const spacingX = realW() / (cols + 1);
+            const spacingY = realH() / (rows + 3);
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const x = spacingX * (c + 1);
+                    const y = spacingY * (r + 2);
+
+                    // Server unit body
+                    ctx.fillStyle = `rgba(28, 28, 30, ${alpha * 0.6})`;
+                    ctx.fillRect(x - 30, y - 12, 60, 24);
+                    ctx.strokeStyle = `rgba(44, 44, 46, ${alpha * 0.4})`;
+                    ctx.lineWidth = 0.5;
+                    ctx.strokeRect(x - 30, y - 12, 60, 24);
+
+                    // LED
+                    const pulse = Math.sin(pulsePhase + r * 0.5 + c * 0.3) * 0.3 + 0.7;
+                    const ledAlpha = alpha * pulse;
+                    ctx.beginPath();
+                    ctx.arc(x + 22, y, 2.5, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(196, 30, 42, ${ledAlpha})`;
+                    ctx.fill();
+
+                    // LED glow
+                    const grd = ctx.createRadialGradient(x + 22, y, 0, x + 22, y, 12);
+                    grd.addColorStop(0, `rgba(196, 30, 42, ${ledAlpha * 0.3})`);
+                    grd.addColorStop(1, 'rgba(196, 30, 42, 0)');
+                    ctx.fillStyle = grd;
+                    ctx.fillRect(x + 10, y - 12, 24, 24);
+                }
+            }
+        }
+
+        // Architecture diagram lines
+        function drawArchDiagram(alpha, progress) {
+            const cx = realW() / 2;
+            const cy = realH() / 2;
+            const nodes = [
+                { x: cx, y: cy - 80, label: 'CORE ENGINE' },
+                { x: cx - 200, y: cy, label: 'VOICE AI' },
+                { x: cx + 200, y: cy, label: 'LEAD ENGINE' },
+                { x: cx - 120, y: cy + 80, label: 'AD OPTIMIZER' },
+                { x: cx + 120, y: cy + 80, label: 'CRM PIPELINE' },
+                { x: cx, y: cy + 140, label: 'ANALYTICS' },
+            ];
+
+            const connections = [
+                [0,1],[0,2],[0,3],[0,4],[0,5],[1,3],[2,4],[3,5],[4,5],[1,2]
+            ];
+
+            const litCount = Math.floor(progress * connections.length);
+            connections.forEach(([a, b], i) => {
+                const lit = i < litCount;
+                ctx.beginPath();
+                ctx.moveTo(nodes[a].x, nodes[a].y);
+                ctx.lineTo(nodes[b].x, nodes[b].y);
+                ctx.strokeStyle = lit
+                    ? `rgba(196, 30, 42, ${alpha * 0.4})`
+                    : `rgba(50, 50, 50, ${alpha * 0.2})`;
+                ctx.lineWidth = lit ? 1 : 0.5;
+                ctx.stroke();
+            });
+
+            const litNodes = Math.floor(progress * nodes.length);
+            nodes.forEach((n, i) => {
+                const lit = i < litNodes;
+                ctx.beginPath();
+                ctx.arc(n.x, n.y, 4, 0, Math.PI * 2);
+                ctx.fillStyle = lit
+                    ? `rgba(196, 30, 42, ${alpha})`
+                    : `rgba(80, 80, 80, ${alpha * 0.4})`;
+                ctx.fill();
+
+                if (lit) {
+                    const grd = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, 20);
+                    grd.addColorStop(0, `rgba(196, 30, 42, ${alpha * 0.2})`);
+                    grd.addColorStop(1, 'rgba(196, 30, 42, 0)');
+                    ctx.fillStyle = grd;
+                    ctx.fillRect(n.x - 20, n.y - 20, 40, 40);
+                }
+
+                ctx.font = '10px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillStyle = lit
+                    ? `rgba(245, 245, 247, ${alpha * 0.8})`
+                    : `rgba(100, 100, 100, ${alpha * 0.3})`;
+                ctx.fillText(n.label, n.x, n.y + 18);
+            });
+        }
+
+        // Code deployment visual
+        function drawCodeDeploy(alpha, t) {
+            const lines = [
+                '$ deploying adrective-core v4.2.1',
+                '  compiling voice-engine ....... done',
+                '  compiling lead-optimizer ..... done',
+                '  compiling ad-engine .......... done',
+                '  compiling crm-pipeline ....... done',
+                '  running integration tests .... passed',
+                '  deploying to production ...... active',
+                '',
+                '  SYSTEM STATUS: OPERATIONAL',
+                '  UPTIME: 99.99%',
+            ];
+
+            const visibleLines = Math.min(lines.length, Math.floor(t * 2.5));
+            const startX = realW() / 2 - 220;
+            const startY = realH() / 2 - 100;
+
+            lines.forEach((line, i) => {
+                if (i >= visibleLines) return;
+                const isStatus = line.includes('OPERATIONAL') || line.includes('UPTIME');
+                const isDone = line.includes('done') || line.includes('passed') || line.includes('active');
+                ctx.font = '13px monospace';
+                ctx.textAlign = 'left';
+
+                if (isStatus) {
+                    ctx.fillStyle = `rgba(196, 30, 42, ${alpha})`;
+                } else if (isDone) {
+                    ctx.fillStyle = `rgba(245, 245, 247, ${alpha * 0.9})`;
+                } else {
+                    ctx.fillStyle = `rgba(150, 150, 150, ${alpha * 0.6})`;
+                }
+                ctx.fillText(line, startX, startY + i * 22);
+            });
+
+            // Progress bar
+            if (visibleLines > 6) {
+                const barY = startY + lines.length * 22 + 20;
+                const barW = 440;
+                const progress = Math.min(1, (t - 2) / 3);
+                ctx.fillStyle = `rgba(40, 40, 40, ${alpha * 0.5})`;
+                ctx.fillRect(startX, barY, barW, 4);
+                ctx.fillStyle = `rgba(196, 30, 42, ${alpha})`;
+                ctx.fillRect(startX, barY, barW * easeOut(Math.max(0, progress)), 4);
+            }
+        }
+
+        // Scene-specific text
+        const sceneTexts = [
+            { main: 'The future doesn\'t wait.' },
+            { main: '24/7 Autonomous AI Reception' },
+            { main: 'Inbound. Outbound. Always Active.' },
+            { main: 'Best-in-Class Lead Generation' },
+            { main: 'Built From the Ground Up', sub: 'Fully Owned. Fully Licensed.' },
+            { main: 'Total Control. Zero Compromise.' },
+            { main: '' }, // Logo scene - handled specially
+            { main: 'Autonomous Growth. Engineered.' }
+        ];
+
+        function showSceneText(idx) {
+            overlay.innerHTML = '';
+            if (idx === 6) {
+                // Logo reveal
+                const logoEl = document.createElement('div');
+                logoEl.className = 'scene-text logo-text';
+                logoEl.innerHTML = 'Adrective<span class="logo-dot">.</span>Ai';
+                overlay.appendChild(logoEl);
+                setTimeout(() => logoEl.classList.add('active'), 200);
+            } else if (idx >= 0 && idx < sceneTexts.length) {
+                const data = sceneTexts[idx];
+                if (data.main) {
+                    const mainEl = document.createElement('div');
+                    mainEl.className = 'scene-text';
+                    mainEl.textContent = data.main;
+                    overlay.appendChild(mainEl);
+                    setTimeout(() => mainEl.classList.add('active'), 300);
+                }
+                if (data.sub) {
+                    const subEl = document.createElement('div');
+                    subEl.className = 'scene-text tagline';
+                    subEl.style.marginTop = '60px';
+                    subEl.textContent = data.sub;
+                    overlay.appendChild(subEl);
+                    setTimeout(() => subEl.classList.add('active'), 1200);
+                }
+            }
+        }
+
+        function hideSceneText() {
+            overlay.querySelectorAll('.scene-text').forEach(el => el.classList.remove('active'));
+        }
+
+        // AUDIO ENGINE — Web Audio API
+        function initAudio() {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        function playBass(time, freq, duration, volume) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0, audioCtx.currentTime + time);
+            gain.gain.linearRampToValueAtTime(volume, audioCtx.currentTime + time + 0.3);
+            gain.gain.linearRampToValueAtTime(volume * 0.7, audioCtx.currentTime + time + duration * 0.6);
+            gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + time + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(audioCtx.currentTime + time);
+            osc.stop(audioCtx.currentTime + time + duration);
+        }
+
+        function playHum(startDelay, duration, freq, vol) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            const filter = audioCtx.createBiquadFilter();
+            osc.type = 'sawtooth';
+            osc.frequency.value = freq;
+            filter.type = 'lowpass';
+            filter.frequency.value = 200;
+            filter.Q.value = 1;
+            gain.gain.setValueAtTime(0, audioCtx.currentTime + startDelay);
+            gain.gain.linearRampToValueAtTime(vol, audioCtx.currentTime + startDelay + 2);
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime + startDelay + duration - 2);
+            gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + startDelay + duration);
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(audioCtx.currentTime + startDelay);
+            osc.stop(audioCtx.currentTime + startDelay + duration);
+        }
+
+        function playPad(startDelay, duration, freq, vol) {
+            if (!audioCtx) return;
+            const osc1 = audioCtx.createOscillator();
+            const osc2 = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            const filter = audioCtx.createBiquadFilter();
+            osc1.type = 'sine';
+            osc1.frequency.value = freq;
+            osc2.type = 'sine';
+            osc2.frequency.value = freq * 1.005; // slight detune
+            filter.type = 'lowpass';
+            filter.frequency.value = 400;
+            gain.gain.setValueAtTime(0, audioCtx.currentTime + startDelay);
+            gain.gain.linearRampToValueAtTime(vol, audioCtx.currentTime + startDelay + 3);
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime + startDelay + duration - 3);
+            gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + startDelay + duration);
+            osc1.connect(filter);
+            osc2.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc1.start(audioCtx.currentTime + startDelay);
+            osc1.stop(audioCtx.currentTime + startDelay + duration);
+            osc2.start(audioCtx.currentTime + startDelay);
+            osc2.stop(audioCtx.currentTime + startDelay + duration);
+        }
+
+        function scheduleAudio() {
+            // Deep electrical hum throughout
+            playHum(1, 55, 40, 0.06);
+            playHum(1, 55, 60, 0.03);
+
+            // Bass pulses at scene transitions
+            playBass(0.5, 35, 3, 0.08);
+            playBass(8, 40, 2, 0.1);
+            playBass(18, 38, 2, 0.1);
+            playBass(28, 42, 2, 0.12);
+            playBass(38, 36, 2.5, 0.12);
+            playBass(46, 40, 2, 0.1);
+            playBass(52, 32, 4, 0.15);   // Logo reveal - deepest
+            playBass(58, 30, 3, 0.12);   // Final hit
+
+            // Synth pad builds from scene 3 onward
+            playPad(18, 35, 55, 0.04);
+            playPad(18, 35, 82.5, 0.025);
+
+            // Sub-bass heartbeat pulse pattern (scenes 1-6)
+            for (let i = 0; i < 20; i++) {
+                playBass(3 + i * 2.5, 28, 0.8, 0.04);
+            }
+        }
+
+        // MAIN RENDER LOOP
+        function getSceneProgress(t, sceneIdx) {
+            const s = scenes[sceneIdx];
+            return Math.max(0, Math.min(1, (t - s.start) / (s.end - s.start)));
+        }
+
+        function render(timestamp) {
+            if (!playing) return;
+
+            const t = (timestamp - startTime) / 1000;
+
+            if (t > TOTAL_DURATION + 2) {
+                playing = false;
+                ctx.clearRect(0, 0, realW(), realH());
+                hideSceneText();
+                playBtn.style.display = 'block';
+                playBtn.textContent = 'Replay';
+                progressBar.style.width = '0%';
+                return;
+            }
+
+            // Update progress bar
+            progressBar.style.width = Math.min(100, (t / TOTAL_DURATION) * 100) + '%';
+
+            // Determine current scene
+            let newScene = -1;
+            for (let i = 0; i < scenes.length; i++) {
+                if (t >= scenes[i].start && t < scenes[i].end) {
+                    newScene = i;
+                    break;
+                }
+            }
+            if (newScene !== currentScene) {
+                currentScene = newScene;
+                hideSceneText();
+                if (currentScene >= 0) {
+                    setTimeout(() => showSceneText(currentScene), 500);
+                }
+            }
+
+            // Clear
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, realW(), realH());
+
+            // SCENE RENDERING
+            if (currentScene === 0) {
+                // Scene 1: The Signal
+                const p = getSceneProgress(t, 0);
+                const lineAlpha = fadeIn(p, 0.2, 0.3);
+
+                // Red horizontal line
+                const lineY = realH() / 2;
+                const lineW = realW() * 0.7;
+                const lineX = (realW() - lineW) / 2;
+                const pulse = Math.sin(t * 2) * 0.3 + 0.7;
+
+                ctx.beginPath();
+                ctx.moveTo(lineX, lineY);
+                ctx.lineTo(lineX + lineW, lineY);
+                ctx.strokeStyle = `rgba(196, 30, 42, ${lineAlpha * pulse})`;
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                // Red glow on line
+                const lineGrd = ctx.createLinearGradient(lineX, lineY - 30, lineX, lineY + 30);
+                lineGrd.addColorStop(0, 'rgba(196, 30, 42, 0)');
+                lineGrd.addColorStop(0.5, `rgba(196, 30, 42, ${lineAlpha * pulse * 0.15})`);
+                lineGrd.addColorStop(1, 'rgba(196, 30, 42, 0)');
+                ctx.fillStyle = lineGrd;
+                ctx.fillRect(lineX, lineY - 30, lineW, 60);
+
+                // Data streams
+                const streamAlpha = fadeIn(p, 0.3, 0.3);
+                dataStreams.forEach(s => {
+                    s.update();
+                    s.draw(streamAlpha);
+                });
+
+                // Fade out at scene end
+                const sceneOut = fadeOut(p, 0.85, 0.15);
+                if (sceneOut < 1) {
+                    ctx.fillStyle = `rgba(0, 0, 0, ${1 - sceneOut})`;
+                    ctx.fillRect(0, 0, realW(), realH());
+                }
+            }
+
+            else if (currentScene === 1) {
+                // Scene 2: Autonomous Reception
+                const p = getSceneProgress(t, 1);
+                const sceneAlpha = fadeInOut(p, 0, 0.15, 0.85, 0.15);
+                const localT = t - scenes[1].start;
+
+                // Waveform
+                const waveX = realW() * 0.15;
+                const waveY = realH() * 0.35;
+                waveformBars.forEach((bar, i) => {
+                    bar.update(localT);
+                    bar.draw(waveX + i * 8, waveY, sceneAlpha * 0.8, 'red');
+                });
+
+                // Waveform label
+                ctx.font = '10px Inter, sans-serif';
+                ctx.textAlign = 'left';
+                ctx.fillStyle = `rgba(150, 150, 150, ${sceneAlpha * 0.5})`;
+                ctx.fillText('VOICE AI — ACTIVE', waveX, waveY - 40);
+
+                // Flow chart: Call → Qualify → Book
+                const flowY = realH() * 0.6;
+                const flowSteps = ['INCOMING CALL', 'INTENT CLASSIFIED', 'LEAD QUALIFIED', 'CALENDAR BOOKED'];
+                const litSteps = Math.floor(localT * 0.8);
+                const flowStartX = realW() * 0.2;
+                const flowSpacing = (realW() * 0.6) / (flowSteps.length - 1);
+
+                flowSteps.forEach((step, i) => {
+                    const x = flowStartX + i * flowSpacing;
+                    const lit = i <= litSteps;
+                    drawFlowNode(x, flowY, step, lit, sceneAlpha);
+                    if (i < flowSteps.length - 1) {
+                        drawFlowArrow(
+                            x + step.length * 4 + 18, flowY,
+                            flowStartX + (i+1) * flowSpacing - flowSteps[i+1].length * 4 - 18, flowY,
+                            i < litSteps, sceneAlpha
+                        );
+                    }
+                });
+
+                // Time indicator - 24/7
+                const times = ['03:17 AM', '11:42 AM', '07:58 PM', '01:23 AM'];
+                const timeIdx = Math.floor(localT * 0.6) % times.length;
+                ctx.font = '300 14px Inter, sans-serif';
+                ctx.textAlign = 'right';
+                ctx.fillStyle = `rgba(196, 30, 42, ${sceneAlpha * 0.6})`;
+                ctx.fillText(times[timeIdx], realW() * 0.85, realH() * 0.2);
+                ctx.font = '10px Inter, sans-serif';
+                ctx.fillStyle = `rgba(100, 100, 100, ${sceneAlpha * 0.4})`;
+                ctx.fillText('SYSTEM ACTIVE', realW() * 0.85, realH() * 0.2 + 18);
+            }
+
+            else if (currentScene === 2) {
+                // Scene 3: Outbound Intelligence
+                const p = getSceneProgress(t, 2);
+                const sceneAlpha = fadeInOut(p, 0, 0.15, 0.85, 0.15);
+                const localT = t - scenes[2].start;
+
+                // Multiple call indicators
+                const callCount = 5;
+                const callCenterX = realW() / 2;
+                const callCenterY = realH() * 0.35;
+
+                for (let i = 0; i < callCount; i++) {
+                    const angle = (i / callCount) * Math.PI * 2 - Math.PI / 2;
+                    const radius = 100 + Math.sin(localT + i) * 10;
+                    const cx = callCenterX + Math.cos(angle) * radius;
+                    const cy = callCenterY + Math.sin(angle) * radius * 0.5;
+                    const active = i <= Math.floor(localT * 0.6);
+
+                    // Call pulse ring
+                    if (active) {
+                        const pulseR = 15 + Math.sin(localT * 3 + i) * 5;
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, pulseR, 0, Math.PI * 2);
+                        ctx.strokeStyle = `rgba(196, 30, 42, ${sceneAlpha * 0.6})`;
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+
+                        const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, pulseR);
+                        grd.addColorStop(0, `rgba(196, 30, 42, ${sceneAlpha * 0.15})`);
+                        grd.addColorStop(1, 'rgba(196, 30, 42, 0)');
+                        ctx.fillStyle = grd;
+                        ctx.fill();
+
+                        // Connecting line to center
+                        ctx.beginPath();
+                        ctx.moveTo(callCenterX, callCenterY);
+                        ctx.lineTo(cx, cy);
+                        ctx.strokeStyle = `rgba(196, 30, 42, ${sceneAlpha * 0.2})`;
+                        ctx.lineWidth = 0.5;
+                        ctx.stroke();
+                    }
+
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+                    ctx.fillStyle = active
+                        ? `rgba(196, 30, 42, ${sceneAlpha})`
+                        : `rgba(60, 60, 60, ${sceneAlpha * 0.4})`;
+                    ctx.fill();
+
+                    ctx.font = '9px Inter, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillStyle = active
+                        ? `rgba(245, 245, 247, ${sceneAlpha * 0.7})`
+                        : `rgba(80, 80, 80, ${sceneAlpha * 0.3})`;
+                    ctx.fillText(`LEAD ${String(i + 1).padStart(3, '0')}`, cx, cy + 20);
+                }
+
+                // Center hub
+                ctx.beginPath();
+                ctx.arc(callCenterX, callCenterY, 6, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(196, 30, 42, ${sceneAlpha})`;
+                ctx.fill();
+                ctx.font = '10px Inter, sans-serif';
+                ctx.fillStyle = `rgba(245, 245, 247, ${sceneAlpha * 0.6})`;
+                ctx.textAlign = 'center';
+                ctx.fillText('AI DIALER', callCenterX, callCenterY - 15);
+
+                // Decision tree below
+                const treeY = realH() * 0.65;
+                const treeNodes = ['CONTACT', 'ENGAGE', 'QUALIFY', 'OBJECTION?', 'RESOLVE', 'BOOK'];
+                const treeX = realW() * 0.2;
+                const treeSpacing = (realW() * 0.6) / (treeNodes.length - 1);
+                const litTree = Math.floor(localT * 0.7);
+
+                treeNodes.forEach((node, i) => {
+                    const x = treeX + i * treeSpacing;
+                    const lit = i <= litTree;
+                    drawFlowNode(x, treeY, node, lit, sceneAlpha * 0.8);
+                    if (i < treeNodes.length - 1) {
+                        drawFlowArrow(
+                            x + node.length * 4 + 18, treeY,
+                            treeX + (i+1) * treeSpacing - treeNodes[i+1].length * 4 - 18, treeY,
+                            i < litTree, sceneAlpha * 0.8
+                        );
+                    }
+                });
+
+                // Active calls counter
+                const activeCalls = Math.min(callCount, Math.floor(localT * 0.6) + 1);
+                drawMetric(realW() * 0.85, realH() * 0.2, 'ACTIVE CALLS', String(activeCalls), sceneAlpha, true);
+            }
+
+            else if (currentScene === 3) {
+                // Scene 4: Lead Generation Engine
+                const p = getSceneProgress(t, 3);
+                const sceneAlpha = fadeInOut(p, 0, 0.15, 0.85, 0.15);
+                const localT = t - scenes[3].start;
+
+                // Dashboard panels
+                // Panel 1: Ad spend bar chart
+                const chartValues = [0.6, 0.8, 0.4, 0.9, 0.3, 0.7, 0.5, 0.85, 0.95, 0.6];
+                const activeBar = Math.floor(localT * 1.2);
+                drawBarChart(realW() * 0.08, realH() * 0.25, realW() * 0.35, 120, chartValues, activeBar, sceneAlpha);
+                ctx.font = '10px Inter, sans-serif';
+                ctx.textAlign = 'left';
+                ctx.fillStyle = `rgba(150, 150, 150, ${sceneAlpha * 0.5})`;
+                ctx.fillText('AD PERFORMANCE BY CHANNEL', realW() * 0.08, realH() * 0.22);
+
+                // Panel 2: Funnel
+                const funnelX = realW() * 0.55;
+                const funnelY = realH() * 0.2;
+                const funnelStages = [
+                    { label: 'IMPRESSIONS', width: 280, value: '142,847' },
+                    { label: 'CLICKS', width: 220, value: '8,571' },
+                    { label: 'LEADS', width: 160, value: '1,284' },
+                    { label: 'QUALIFIED', width: 110, value: '642' },
+                    { label: 'CONVERTED', width: 70, value: '198' }
+                ];
+                const funnelSqueeze = Math.min(1, localT / 6); // funnel tightens
+
+                funnelStages.forEach((stage, i) => {
+                    const y = funnelY + i * 40;
+                    const w = stage.width * (1 - funnelSqueeze * 0.15 * (funnelStages.length - 1 - i) / funnelStages.length);
+                    const intensity = (funnelStages.length - i) / funnelStages.length;
+                    ctx.fillStyle = `rgba(196, 30, 42, ${sceneAlpha * intensity * 0.3})`;
+                    ctx.fillRect(funnelX - w/2, y, w, 30);
+                    ctx.strokeStyle = `rgba(196, 30, 42, ${sceneAlpha * intensity * 0.5})`;
+                    ctx.lineWidth = 0.5;
+                    ctx.strokeRect(funnelX - w/2, y, w, 30);
+
+                    ctx.font = '9px Inter, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillStyle = `rgba(245, 245, 247, ${sceneAlpha * 0.7})`;
+                    ctx.fillText(stage.label, funnelX - 50, y + 18);
+                    ctx.font = '500 11px Inter, sans-serif';
+                    ctx.fillStyle = `rgba(245, 245, 247, ${sceneAlpha * 0.9})`;
+                    ctx.fillText(stage.value, funnelX + 60, y + 18);
+                });
+
+                // Bottom metrics
+                const cpa = Math.max(12, 48 - localT * 4.5).toFixed(0);
+                const quality = Math.min(97, 62 + localT * 4.5).toFixed(0);
+                drawMetric(realW() * 0.2, realH() * 0.72, 'COST PER ACQUISITION', '$' + cpa, sceneAlpha, false);
+                drawMetric(realW() * 0.5, realH() * 0.72, 'LEAD QUALITY SCORE', quality + '%', sceneAlpha, true);
+                drawMetric(realW() * 0.8, realH() * 0.72, 'ROAS', (2.1 + localT * 0.3).toFixed(1) + 'x', sceneAlpha, false);
+
+                // Floating particles
+                particles.forEach(p => {
+                    p.update();
+                    p.draw('red', sceneAlpha * 0.3);
+                });
+            }
+
+            else if (currentScene === 4) {
+                // Scene 5: Infrastructure
+                const p = getSceneProgress(t, 4);
+                const sceneAlpha = fadeInOut(p, 0, 0.2, 0.8, 0.2);
+                const localT = t - scenes[4].start;
+
+                // Server grid
+                drawServerGrid(sceneAlpha * 0.7, localT * 0.5);
+
+                // Architecture diagram overlay
+                const archAlpha = fadeIn(p, 0.3, 0.3);
+                drawArchDiagram(sceneAlpha * archAlpha * 0.8, Math.min(1, localT / 5));
+            }
+
+            else if (currentScene === 5) {
+                // Scene 6: Total Control
+                const p = getSceneProgress(t, 5);
+                const sceneAlpha = fadeInOut(p, 0, 0.15, 0.8, 0.2);
+                const localT = t - scenes[5].start;
+
+                drawCodeDeploy(sceneAlpha, localT);
+
+                // Floating particles
+                particles.forEach(p => {
+                    p.update();
+                    p.draw('white', sceneAlpha * 0.15);
+                });
+            }
+
+            else if (currentScene === 6) {
+                // Scene 7: Logo Reveal
+                const p = getSceneProgress(t, 6);
+                const localT = t - scenes[6].start;
+
+                // Central red glow emergence
+                const glowIntensity = easeOut(Math.min(1, localT / 3));
+                const glowRadius = 80 + glowIntensity * 120;
+
+                const grd = ctx.createRadialGradient(
+                    realW()/2, realH()/2, 0,
+                    realW()/2, realH()/2, glowRadius
+                );
+                grd.addColorStop(0, `rgba(196, 30, 42, ${glowIntensity * 0.25})`);
+                grd.addColorStop(0.4, `rgba(139, 26, 26, ${glowIntensity * 0.12})`);
+                grd.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                ctx.fillStyle = grd;
+                ctx.fillRect(0, 0, realW(), realH());
+
+                // Outer ambient glow
+                const outerGrd = ctx.createRadialGradient(
+                    realW()/2, realH()/2, 0,
+                    realW()/2, realH()/2, glowRadius * 3
+                );
+                outerGrd.addColorStop(0, `rgba(196, 30, 42, ${glowIntensity * 0.06})`);
+                outerGrd.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                ctx.fillStyle = outerGrd;
+                ctx.fillRect(0, 0, realW(), realH());
+
+                // Subtle particle dust
+                particles.forEach(p => {
+                    p.update();
+                    p.draw('red', glowIntensity * 0.15);
+                });
+            }
+
+            else if (currentScene === 7) {
+                // Scene 8: The Close
+                const p = getSceneProgress(t, 7);
+                const localT = t - scenes[7].start;
+
+                // Fading red glow
+                const fadeAmt = Math.max(0, 1 - localT / 5);
+                const grd = ctx.createRadialGradient(
+                    realW()/2, realH()/2, 0,
+                    realW()/2, realH()/2, 150
+                );
+                grd.addColorStop(0, `rgba(196, 30, 42, ${fadeAmt * 0.08})`);
+                grd.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                ctx.fillStyle = grd;
+                ctx.fillRect(0, 0, realW(), realH());
+
+                // Final fade to black
+                if (localT > 4) {
+                    const blackFade = Math.min(1, (localT - 4) / 2);
+                    ctx.fillStyle = `rgba(0, 0, 0, ${blackFade})`;
+                    ctx.fillRect(0, 0, realW(), realH());
+                }
+            }
+
+            // Global vignette
+            const vignette = ctx.createRadialGradient(
+                realW()/2, realH()/2, realW() * 0.3,
+                realW()/2, realH()/2, realW() * 0.7
+            );
+            vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+            vignette.addColorStop(1, 'rgba(0, 0, 0, 0.4)');
+            ctx.fillStyle = vignette;
+            ctx.fillRect(0, 0, realW(), realH());
+
+            // Film grain
+            if (Math.random() > 0.5) {
+                for (let i = 0; i < 800; i++) {
+                    const gx = Math.random() * realW();
+                    const gy = Math.random() * realH();
+                    ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.015})`;
+                    ctx.fillRect(gx, gy, 1, 1);
+                }
+            }
+
+            requestAnimationFrame(render);
+        }
+
+        // START
+        playBtn.addEventListener('click', () => {
+            playBtn.style.display = 'none';
+            playing = true;
+            currentScene = -1;
+            startTime = performance.now();
+
+            initAudio();
+            scheduleAudio();
+
+            requestAnimationFrame(render);
+        });
+
+        // Initial dark frame
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, realW(), realH());
+
+    })();
+    </script>
+</body>
+</html>

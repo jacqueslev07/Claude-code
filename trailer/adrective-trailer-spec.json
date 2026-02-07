@@ -1,0 +1,237 @@
+{
+  "project": {
+    "title": "Adrective.Ai — Autonomous Growth",
+    "type": "Company Launch / Investor Reveal Trailer",
+    "target_duration_seconds": 60,
+    "target_audience": "Series-level investors, enterprise partners, industry analysts",
+    "deliverable": "16:9, 4K, 24fps cinematic trailer"
+  },
+
+  "creative_direction": {
+    "tone": [
+      "Controlled confidence — never shouts, never needs to",
+      "Sophisticated menace — the quiet certainty of something that already won",
+      "Technical elegance — every frame communicates precision engineering",
+      "Investor-grade gravity — this is infrastructure, not hype"
+    ],
+    "inspiration": [
+      "Apple 'Introducing M1' cinematography — the way light reveals machined surfaces",
+      "Wayne Enterprises R&D — private, powerful, operating on another level",
+      "James Bond Q-Branch tech reveal — dangerous capability shown with restraint",
+      "Bloomberg Terminal aesthetics — data as authority",
+      "Westworld opening credits — mechanical precision, beauty in systems"
+    ],
+    "anti_references": [
+      "NO startup sizzle reels with stock footage of people shaking hands",
+      "NO epic trailer booms, risers, or Hollywood explosion sound design",
+      "NO particle effects that look like a screensaver",
+      "NO generic 'AI brain' or neural network visualizations",
+      "NO motivational speaker energy — this is a weapons demonstration, not a TED talk"
+    ]
+  },
+
+  "visual_identity": {
+    "color_palette": {
+      "primary_black": "#0A0A0A",
+      "primary_red": "#C41E2A",
+      "matte_red": "#8B1A1A",
+      "dark_graphite": "#1C1C1E",
+      "steel_grey": "#2C2C2E",
+      "soft_white_glow": "#F5F5F7",
+      "crimson_accent": "#DC143C",
+      "deep_charcoal": "#121214"
+    },
+    "color_usage": {
+      "backgrounds": "Deep black (#0A0A0A) to dark graphite (#1C1C1E) gradients",
+      "text": "Soft white (#F5F5F7) — clean, high contrast, no drop shadows",
+      "accents": "Red used sparingly — data highlights, UI elements, logo glow",
+      "rule": "Red is earned, not sprayed. It appears at moments of power and revelation."
+    },
+    "typography": {
+      "primary": "SF Pro Display or equivalent geometric sans-serif",
+      "weight": "Light to Medium — never bold headlines, let the words carry weight",
+      "tracking": "Wide letter-spacing on taglines for that premium feel",
+      "animation": "Text fades in from opacity 0, no sliding or bouncing"
+    },
+    "lighting": {
+      "style": "Low-key, high-contrast, chiaroscuro",
+      "key_light": "Single-source or edge-lit — surfaces revealed by controlled light",
+      "fill": "Minimal — deep shadows are intentional, not accidental",
+      "practicals": "Soft red LED glows, screen light reflections, status indicator lights",
+      "atmosphere": "Subtle volumetric haze to catch light beams — very restrained"
+    },
+    "camera": {
+      "movement": "Slow, deliberate, weighted — as if the camera itself is expensive",
+      "speed": "2-5 second slow dolly moves, gentle orbital rotations",
+      "cuts": "Dissolves and hard cuts only — no wipes, no transitions that draw attention",
+      "depth_of_field": "Shallow — isolate subjects, blur backgrounds into soft bokeh",
+      "lens": "Anamorphic feel — subtle lens flares from red light sources"
+    }
+  },
+
+  "scenes": [
+    {
+      "scene": 1,
+      "title": "COLD OPEN — The Signal",
+      "duration_seconds": 6,
+      "description": "Pure black. Two seconds of silence. Then a deep electrical hum fades in — subsonic, felt more than heard. A hairline-thin red horizontal line appears dead center, pulsing once like a heartbeat monitor. Abstract data streams begin flowing along it — minimal, precise, moving left to right with surgical rhythm. The streams are not chaotic; they are organized, deliberate, like information being processed by something intelligent.",
+      "text_on_screen": "The future doesn't wait.",
+      "text_timing": "Appears 3 seconds in, holds for 3 seconds, fades",
+      "camera": "Static. Locked off. The stillness is the statement.",
+      "color_notes": "Black background. Red line. Soft white data elements. Nothing else.",
+      "mood": "Something just woke up."
+    },
+    {
+      "scene": 2,
+      "title": "FEATURE REVEAL — Autonomous Reception",
+      "duration_seconds": 8,
+      "description": "Cinematic macro shots of an AI system operating. A voice waveform visualizer renders speech in real-time — clean sine waves, not messy audio graphs. Call routing logic appears as a minimal flowchart: incoming call detected, caller intent classified, qualification criteria evaluated, calendar availability checked, appointment booked. Each step illuminates sequentially in red as it completes. The system is answering calls, qualifying leads, and booking appointments with zero human input. Show a clock face or time indicator suggesting this runs at 3 AM, noon, midnight — it never stops.",
+      "text_on_screen": "24/7 Autonomous AI Reception",
+      "text_timing": "Appears at second 3, holds through scene",
+      "camera": "Slow push-in toward the system interface, shallow depth of field",
+      "color_notes": "Dark interface with red status indicators. White text. Graphite panels.",
+      "mood": "This thing works while everyone else sleeps."
+    },
+    {
+      "scene": 3,
+      "title": "FEATURE REVEAL — Outbound Intelligence",
+      "duration_seconds": 8,
+      "description": "Smooth transition. The perspective shifts from receiving to attacking — AI agents initiating outbound calls. Visualize an intelligent dialing system: lead cards appear with qualification scores, an AI agent selects the highest-priority lead, dials, and engages in natural conversation shown as a clean voice waveform. A decision tree operates in real-time behind the call — branching logic, objection handling paths, booking triggers. Multiple parallel call streams appear, showing the system handling volume effortlessly. Every lead captured from advertising is contacted automatically.",
+      "text_on_screen": "Inbound. Outbound. Always Active.",
+      "text_timing": "Text appears at second 2",
+      "camera": "Orbital move around the system visualization, slow and confident",
+      "color_notes": "Multiple red pulse indicators showing active calls. Dark background.",
+      "mood": "No lead goes untouched. No opportunity dies in a queue."
+    },
+    {
+      "scene": 4,
+      "title": "FEATURE REVEAL — Lead Generation Engine",
+      "duration_seconds": 8,
+      "description": "High-end data visualization. Ad performance dashboards rendered as premium dark-mode interfaces — not Excel charts, but Bloomberg-terminal-grade displays. Show ad spend dynamically reallocating in real-time: budget flowing away from underperforming channels, concentrating on high-converting segments. Lead quality scores recalibrating. Conversion funnels tightening themselves — the wide mouth narrows as filtering gets smarter. A cost-per-acquisition number visibly drops while lead quality score rises. This is a machine learning optimization engine shown through elegant data.",
+      "text_on_screen": "Best-in-Class Lead Generation & Ad Optimization",
+      "text_timing": "Appears at second 2, tagline holds",
+      "camera": "Slow dolly across the dashboard surface, parallax depth between data layers",
+      "color_notes": "Red for positive metrics/gains. White data. Dark graphite background panels.",
+      "mood": "Every dollar works harder. The system is smarter than the market."
+    },
+    {
+      "scene": 5,
+      "title": "AUTHORITY — Proprietary Infrastructure",
+      "duration_seconds": 8,
+      "description": "The tone deepens. We pull back to reveal the infrastructure that powers everything. Dark server room aesthetics — not generic stock footage, but a stylized representation: rows of matte black server units with subtle red status LEDs. Custom software architecture diagrams appear as floating holographic schematics — clean vector lines showing system topology. A prominent visual element: 'NO THIRD-PARTY DEPENDENCIES' or a visual metaphor showing external vendor logos greyed out / absent while the Adrective system stands alone, self-contained. Software interface mockups scroll through — every tool, every system, every line of code is proprietary.",
+      "text_on_screen": "Built From the Ground Up. Fully Owned. Fully Licensed.",
+      "text_timing": "Three-part text reveal — each phrase appears sequentially",
+      "camera": "Slow reverse dolly revealing scale. Wide establishing shot energy.",
+      "color_notes": "Deepest blacks. Red server LEDs. Minimal white for architecture diagrams.",
+      "mood": "This isn't assembled from other people's parts. This is engineered."
+    },
+    {
+      "scene": 6,
+      "title": "AUTHORITY — Total Control",
+      "duration_seconds": 6,
+      "description": "Elegant shots of the system maintaining itself. Code deploying in a terminal-style interface — clean monospace text scrolling, but stylized and readable. An uptime counter showing 99.99%. System updates rolling out smoothly — progress bars completing in red, version numbers incrementing. A split-screen or layered view showing before/after of a system update — seamless, zero downtime. The message: we control every variable. Nothing is outsourced. Nothing is left to chance.",
+      "text_on_screen": "Total Control. Zero Compromise.",
+      "text_timing": "Appears mid-scene as a statement",
+      "camera": "Tight macro shots of interface details, slow pan across code deployment",
+      "color_notes": "Terminal green is forbidden — use red and white on black for all code/system UI",
+      "mood": "Absolute sovereignty over every component."
+    },
+    {
+      "scene": 7,
+      "title": "THE REVEAL — Logo Emergence",
+      "duration_seconds": 8,
+      "description": "Everything goes dark. A beat of silence. Then, from the absolute center of frame, a soft red glow begins to form — like something powering on deep inside a machine. The Adrective.Ai logo materializes from this glow. Not a flashy 3D animation — the logo simply emerges, as if it was always there and the light is just now reaching it. The red 'A' mark is the focal point, edge-lit with a subtle crimson bloom. The full wordmark 'Adrective.Ai' appears beneath in clean white. The logo settles. It doesn't move. It doesn't need to.",
+      "text_on_screen": "Adrective.Ai",
+      "text_timing": "Logo IS the text — no additional copy during reveal",
+      "camera": "Locked off, center frame. No movement. The logo commands the frame.",
+      "color_notes": "Red logo glow against pure black. White wordmark. Nothing else exists.",
+      "mood": "Arrival. Not an introduction — a declaration."
+    },
+    {
+      "scene": 8,
+      "title": "CLOSE — The Tagline",
+      "duration_seconds": 8,
+      "description": "The logo remains but dims slightly as the tagline fades in beneath it with generous spacing. A final deep bass pulse — single, definitive, like a door locking. Then absolute silence for 2-3 seconds. The screen holds. Black. Logo. Tagline. Nothing moves. This is how it ends — not with a bang, but with the quiet confidence of something that doesn't need your approval to be inevitable. Optional: a subtle URL or 'Coming Soon' appears at the very bottom in small, refined text before the final fade to black.",
+      "text_on_screen": "Autonomous Growth. Engineered.",
+      "text_timing": "Tagline appears 2 seconds in. Holds until fade. Optional URL at second 5.",
+      "camera": "Static. The stillness after the logo reveal is the most powerful moment.",
+      "color_notes": "Dimmed red logo. White tagline. Pure black everywhere else.",
+      "mood": "This is already happening. You're just now finding out."
+    }
+  ],
+
+  "audio_direction": {
+    "music_style": "Original dark ambient score — NOT a licensed track",
+    "elements": [
+      "Sub-bass foundation: 30-60Hz sine wave pulses, slow rhythm like a resting heartbeat",
+      "Analog synth pad: low, warm, slightly detuned — creates unease without aggression",
+      "Electrical hum texture: the sound of large machines idling, capacitors charging",
+      "Metallic resonance: occasional deep reverb hits, like striking a massive steel beam far away",
+      "Digital artifacts: very subtle glitch textures during scene transitions, barely perceptible"
+    ],
+    "arc": {
+      "scenes_1_2": "Minimal. Bass hum and electrical ambience only.",
+      "scenes_3_4": "Synth pad enters. Pulse becomes more defined. Building quietly.",
+      "scenes_5_6": "Full texture. All elements present but controlled. Tension at peak.",
+      "scene_7": "Everything drops out except the bass. Logo reveal gets a single deep pulse.",
+      "scene_8": "One final bass hit. Then silence. Let the black screen breathe."
+    },
+    "forbidden": [
+      "Epic trailer horns (BRAAAM)",
+      "Uplifting piano",
+      "Vocal choirs",
+      "Drum builds / snare rolls",
+      "Stock 'corporate inspiration' music",
+      "Anything that sounds like it belongs in a Marvel trailer"
+    ],
+    "reference_artists": [
+      "Hans Zimmer — Interstellar (restrained cues only)",
+      "Trent Reznor & Atticus Ross — The Social Network soundtrack",
+      "Ben Salisbury & Geoff Barrow — Ex Machina soundtrack",
+      "Cliff Martinez — drive, minimal, synthetic"
+    ]
+  },
+
+  "production_notes": {
+    "recommended_tools": {
+      "primary_video": {
+        "tool": "Runway Gen-3 Alpha Turbo",
+        "reason": "Best-in-class for cinematic dark-tone footage, controlled camera motion, and consistent visual style across clips. Handles the low-key lighting and slow camera moves this trailer demands."
+      },
+      "alternative_video": {
+        "tool": "Kling 2.0 Pro",
+        "reason": "Strong alternative for photorealistic renders and longer clip duration (10s vs 5s). Better for the server room and infrastructure scenes."
+      },
+      "text_and_motion": {
+        "tool": "Adobe After Effects or CapCut Pro",
+        "reason": "AI video generators struggle with clean text rendering. All text overlays, the logo reveal, and typography should be composited in post-production."
+      },
+      "audio": {
+        "tool": "Udio or Suno for AI-generated score, or commission a composer",
+        "reason": "The audio is 50% of this trailer's impact. A custom score matching the reference artists will elevate everything."
+      },
+      "editing": {
+        "tool": "DaVinci Resolve (free) or Adobe Premiere Pro",
+        "reason": "Final assembly, color grading (push blacks deeper, refine red tones), and audio mixing."
+      }
+    },
+    "workflow": [
+      "1. Generate each scene as 2-3 separate clips using the scene prompts provided",
+      "2. Select the best generation for each scene",
+      "3. Assemble in timeline editor (DaVinci Resolve or Premiere)",
+      "4. Apply color grade: crush blacks, isolate reds, desaturate everything else",
+      "5. Add all text overlays and typography in After Effects / motion graphics tool",
+      "6. Composite the logo reveal (use your actual logo asset, not AI-generated)",
+      "7. Layer the audio score and sound design",
+      "8. Final mix: audio should feel present but not loud. The bass should be felt.",
+      "9. Export 4K, 24fps, H.265 for maximum quality"
+    ],
+    "critical_rules": [
+      "Never let AI generate your logo — always composite the real asset",
+      "Never let AI generate readable text — always overlay in post",
+      "Keep every scene's color temperature consistent in the grade",
+      "The trailer should feel SLOW. If it feels fast, you have too many cuts.",
+      "Silence is a tool. Use it at the end. Do not fill every second with sound."
+    ]
+  }
+}
