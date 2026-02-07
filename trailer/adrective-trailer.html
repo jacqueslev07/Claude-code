@@ -1008,109 +1008,141 @@
         }
 
         // ═══════════════════════════════════════════
-        // SCENE 1: RECEPTION — Voice AI answering calls
+        // SCENE 1: RECEPTION — Matrix data streams form a voice waveform
         // ═══════════════════════════════════════════
         else if (scene === 1) {
             const p = sp(t, 1);
             const lt = t - S[1].s;
             const a = fadeIO(p, 0, 0.12, 0.88, 0.12);
 
-            drawHexGrid(a * 0.2, lt * 0.3);
+            drawHexGrid(a * 0.15, lt * 0.3);
 
-            // Layout: spectrum orb in upper-center, waveform across mid-lower, flow at bottom
+            // ─── MATRIX DATA COLUMNS — vertical streams that activate one by one ───
+            // Phase 1 (0-4s): Columns activate left-to-right with scrolling code chars
+            // Phase 2 (4-8s): Columns begin oscillating — code morphs into waveform shape
+            // Phase 3 (8-12s): Full coherent voice waveform emerges from the data
 
-            // VOICE CORE — pulsing orb in upper third
-            const coreY = H * 0.32;
-            const corePulse = Math.sin(lt * 4) * 0.3 + 0.7;
-            const coreR = 12 + corePulse * 6;
-            gl.beginPath();
-            gl.arc(W/2, coreY, coreR, 0, Math.PI * 2);
-            gl.fillStyle = `rgba(196,30,42,${a * corePulse * 0.7})`;
-            gl.fill();
-            gl.beginPath();
-            gl.arc(W/2, coreY, coreR * 0.4, 0, Math.PI * 2);
-            gl.fillStyle = `rgba(255,220,220,${a * corePulse * 0.3})`;
-            gl.fill();
-            // Core glow
-            const coreGlow = gl.createRadialGradient(W/2, coreY, 0, W/2, coreY, 90);
-            coreGlow.addColorStop(0, `rgba(196,30,42,${a * 0.1 * corePulse})`);
-            coreGlow.addColorStop(1, 'rgba(0,0,0,0)');
-            gl.fillStyle = coreGlow;
-            gl.fillRect(W/2 - 90, coreY - 90, 180, 180);
+            const colCount = 60;
+            const colW = W / colCount;
+            const chars = '01001011ADRECTIVE.AI010110100111001010';
+            const waveBlend = clamp((lt - 4) / 4); // 0 at lt=4, 1 at lt=8
 
-            // CIRCULAR SPECTRUM — compact, around core orb
-            const specBars = 48;
-            const specFade = fade(lt, 0.3, 1.5);
-            for (let i = 0; i < specBars; i++) {
-                const angle = (i / specBars) * Math.PI * 2 - Math.PI / 2;
-                const freq = Math.sin(lt * 3.5 + i * 0.5) * 0.4 +
-                             Math.sin(lt * 5.3 + i * 1.2) * 0.3 +
-                             Math.sin(lt * 7.1 + i * 0.3) * 0.2 +
-                             Math.sin(lt * 11 + i * 0.8) * 0.1;
-                const amp = Math.abs(freq);
-                const barLen = 15 + amp * 65;
-                const innerR = coreR + 14;
-                const x1 = W/2 + Math.cos(angle) * innerR;
-                const y1 = coreY + Math.sin(angle) * innerR;
-                const x2 = W/2 + Math.cos(angle) * (innerR + barLen);
-                const y2 = coreY + Math.sin(angle) * (innerR + barLen);
-                gl.beginPath(); gl.moveTo(x1, y1); gl.lineTo(x2, y2);
-                gl.strokeStyle = amp > 0.5
-                    ? `rgba(196,30,42,${a * amp * 0.55 * specFade})`
-                    : `rgba(245,245,247,${a * amp * 0.2 * specFade})`;
-                gl.lineWidth = 1.8;
-                gl.stroke();
-                if (amp > 0.45) {
-                    gl.beginPath(); gl.arc(x2, y2, 1.2, 0, Math.PI * 2);
-                    gl.fillStyle = `rgba(196,30,42,${a * amp * 0.4 * specFade})`;
-                    gl.fill();
+            for (let col = 0; col < colCount; col++) {
+                const colX = col * colW + colW / 2;
+                const colNorm = col / colCount;
+
+                // Each column activates at a staggered time
+                const activateTime = col * 0.06 + Math.sin(col * 0.7) * 0.3;
+                const colActive = clamp((lt - activateTime) / 0.8);
+                if (colActive <= 0) continue;
+
+                // Waveform target value for this column
+                const wt = lt * 2.5;
+                const wave = Math.sin(colNorm * 8 + wt) * Math.sin(colNorm * 3.7 + wt * 0.5) * 0.4 +
+                             Math.sin(colNorm * 5 + wt * 0.8) * 0.35 +
+                             Math.sin(colNorm * 12 + wt * 1.8) * 0.12;
+                const envelope = Math.sin(colNorm * Math.PI); // zero at edges
+                const waveY = H * 0.5 + wave * envelope * H * 0.25;
+
+                // Column height: starts as random data stream, converges to wave point
+                const dataHeight = H * 0.5 * colActive; // full stream height
+                const waveHeight = 4 + Math.abs(wave * envelope) * 30; // tight wave line
+
+                if (waveBlend < 1) {
+                    // ── DATA STREAM PHASE: scrolling matrix characters ──
+                    const streamAlpha = colActive * (1 - waveBlend * 0.7);
+                    const streamTop = H * 0.5 - dataHeight * 0.5;
+                    const streamBot = H * 0.5 + dataHeight * 0.5;
+                    const charH = 12;
+                    const scrollSpeed = 2 + (col % 3) * 0.5;
+                    const scrollOffset = lt * scrollSpeed * charH + col * 17;
+
+                    gl.font = '10px monospace';
+                    gl.textAlign = 'center';
+
+                    for (let cy = streamTop; cy < streamBot; cy += charH) {
+                        const charIdx = Math.floor((cy + scrollOffset) / charH);
+                        const ch = chars[((charIdx % chars.length) + chars.length) % chars.length];
+                        const distFromCenter = Math.abs(cy - H * 0.5) / (dataHeight * 0.5);
+                        const charAlpha = (1 - distFromCenter * 0.7) * streamAlpha;
+
+                        // Characters near the wave target glow brighter as blend increases
+                        const distFromWave = Math.abs(cy - waveY) / 40;
+                        const waveProximity = waveBlend * Math.max(0, 1 - distFromWave);
+
+                        const isHot = col % 5 === 0 || waveProximity > 0.5;
+                        gl.fillStyle = isHot
+                            ? `rgba(196,30,42,${a * charAlpha * (0.25 + waveProximity * 0.5)})`
+                            : `rgba(100,120,100,${a * charAlpha * 0.12})`;
+                        gl.fillText(ch, colX, cy);
+                    }
+                }
+
+                // ── WAVE POINT — grows from data ──
+                if (waveBlend > 0 || colActive > 0.8) {
+                    const pointBlend = Math.max(waveBlend, (colActive - 0.8) * 2);
+                    const pointY = lerp(H * 0.5, waveY, pointBlend);
+                    const pointH = lerp(dataHeight * 0.02, waveHeight, pointBlend);
+                    const intensity = envelope * colActive;
+
+                    // Vertical bar at wave position
+                    const barA = a * intensity * (0.15 + pointBlend * 0.45);
+                    const grad = gl.createLinearGradient(colX, pointY - pointH/2, colX, pointY + pointH/2);
+                    grad.addColorStop(0, `rgba(196,30,42,0)`);
+                    grad.addColorStop(0.3, `rgba(196,30,42,${barA})`);
+                    grad.addColorStop(0.5, `rgba(196,30,42,${barA * 1.3})`);
+                    grad.addColorStop(0.7, `rgba(196,30,42,${barA})`);
+                    grad.addColorStop(1, `rgba(196,30,42,0)`);
+                    gl.fillStyle = grad;
+                    gl.fillRect(colX - colW * 0.35, pointY - pointH/2, colW * 0.7, pointH);
+
+                    // Bright center dot on the waveform line
+                    if (pointBlend > 0.5) {
+                        gl.beginPath();
+                        gl.arc(colX, pointY, 1.5 + intensity * 1.5, 0, Math.PI * 2);
+                        gl.fillStyle = `rgba(196,30,42,${a * intensity * pointBlend * 0.6})`;
+                        gl.fill();
+                    }
                 }
             }
-            // Outer ring frame
-            gl.beginPath();
-            gl.arc(W/2, coreY, coreR + 14, 0, Math.PI * 2);
-            gl.strokeStyle = `rgba(196,30,42,${a * 0.06 * specFade})`;
-            gl.lineWidth = 0.5;
-            gl.stroke();
 
-            // Voice ripples from core
-            const rippleCount = Math.floor(lt / 1.0);
-            for (let i = Math.max(0, rippleCount - 4); i <= rippleCount; i++) {
-                const age = lt - i;
-                if (age < 0 || age > 2.5) continue;
-                const rr = age * 110;
+            // Connecting waveform line — draws through all the points once formed
+            if (waveBlend > 0.4) {
+                const lineA = a * (waveBlend - 0.4) / 0.6;
                 gl.beginPath();
-                gl.arc(W/2, coreY, rr, 0, Math.PI * 2);
-                gl.strokeStyle = `rgba(196,30,42,${a * (1 - age / 2.5) * 0.1})`;
-                gl.lineWidth = 1;
+                const wt = lt * 2.5;
+                for (let x = 0; x < W; x += 3) {
+                    const nx2 = x / W;
+                    const wave = Math.sin(nx2 * 8 + wt) * Math.sin(nx2 * 3.7 + wt * 0.5) * 0.4 +
+                                 Math.sin(nx2 * 5 + wt * 0.8) * 0.35 +
+                                 Math.sin(nx2 * 12 + wt * 1.8) * 0.12;
+                    const env = Math.sin(nx2 * Math.PI);
+                    const y = H * 0.5 + wave * env * H * 0.25;
+                    x === 0 ? gl.moveTo(x, y) : gl.lineTo(x, y);
+                }
+                gl.strokeStyle = `rgba(196,30,42,${lineA * 0.5})`;
+                gl.lineWidth = 1.5;
                 gl.stroke();
             }
 
-            // FULL-WIDTH WAVEFORM — across the middle band
-            const waveIntensity = fade(lt, 0.5, 2);
-            drawWaveform(a * 0.8, lt, waveIntensity);
-            if (waveIntensity > 0.3) {
-                drawWaveform(a * 0.2, lt - 0.12, waveIntensity * 0.5);
-            }
-
-            // Soft particles in background
-            for (let i = 0; i < 300; i++) {
-                px[i] += pvx[i] * 0.6; py[i] += pvy[i] * 0.6;
+            // Soft particles
+            for (let i = 0; i < 200; i++) {
+                px[i] += pvx[i] * 0.5; py[i] += pvy[i] * 0.5;
                 if(px[i]>1.1) px[i]=-1.1; if(py[i]>1.1) py[i]=1.1;
                 const sx=(px[i]*.5+.5)*W, sy=(py[i]*.5+.5)*H;
-                const pulse = Math.sin(lt * 2.5 + pph[i]) * 0.3 + 0.7;
-                gl.beginPath(); gl.arc(sx, sy, psz[i]*0.5*pulse, 0, Math.PI*2);
-                gl.fillStyle = `rgba(196,30,42,${a * 0.04 * pulse})`;
+                const pulse = Math.sin(lt * 2 + pph[i]) * 0.3 + 0.7;
+                gl.beginPath(); gl.arc(sx, sy, psz[i]*0.4*pulse, 0, Math.PI*2);
+                gl.fillStyle = `rgba(196,30,42,${a * 0.03 * pulse})`;
                 gl.fill();
             }
 
             // Call processing flow — bottom
-            const flowAlpha = fade(lt, 1.5, 2);
-            const steps = ['DETECT', 'CLASSIFY', 'QUALIFY', 'SCHEDULE', 'CONFIRM'];
+            const flowAlpha = fade(lt, 2, 2);
+            const steps2 = ['DETECT', 'CLASSIFY', 'QUALIFY', 'SCHEDULE', 'CONFIRM'];
             const litSteps = Math.floor(lt * 0.55);
-            drawProcessFlow(W*0.1, H*0.82, W*0.8, steps, litSteps, a * flowAlpha);
+            drawProcessFlow(W*0.1, H*0.84, W*0.8, steps2, litSteps, a * flowAlpha);
 
-            // Time display — top right
+            // Time — top right
             const times = ['02:14 AM', '09:37 AM', '03:51 PM', '11:08 PM'];
             const tIdx = Math.floor(lt * 0.4) % times.length;
             gl.font = '200 13px Inter, sans-serif';
@@ -1119,7 +1151,7 @@
             gl.fillText(times[tIdx], W - 40, 40);
             gl.font = '8px Inter, sans-serif';
             gl.fillStyle = `rgba(100,100,100,${a * 0.2})`;
-            gl.fillText('SYSTEM ACTIVE', W - 40, 55);
+            gl.fillText('VOICE ENGINE ACTIVE', W - 40, 55);
 
             // Call counter — bottom right
             const callNum = Math.min(14, Math.floor(lt * 1.3));
@@ -1130,7 +1162,7 @@
             gl.font = '300 28px Inter, sans-serif';
             gl.fillText(String(callNum).padStart(3, '0'), W - 40, H - 32);
 
-            drawAliveLayer(t, a * 0.7);
+            drawAliveLayer(t, a * 0.6);
         }
 
         // ═══════════════════════════════════════════
@@ -1243,14 +1275,14 @@
             gl.fillStyle = gGlow;
             gl.fillRect(globeCx - globeR*1.5, globeCy - globeR*1.5, globeR*3, globeR*3);
 
-            // Equator and outer edge
+            // Outer globe edge — subtle ring
             gl.beginPath();
-            gl.ellipse(globeCx, globeCy, globeR, globeR, 0, 0, Math.PI * 2);
-            gl.strokeStyle = `rgba(196,30,42,${globeA * 0.2})`;
-            gl.lineWidth = 1;
+            gl.arc(globeCx, globeCy, globeR, 0, Math.PI * 2);
+            gl.strokeStyle = `rgba(196,30,42,${globeA * 0.12})`;
+            gl.lineWidth = 0.5;
             gl.stroke();
 
-            // Latitude lines (horizontal ellipses)
+            // Faint latitude grid (very subtle behind continents)
             for (let lat = -2; lat <= 2; lat++) {
                 const latAngle = (lat / 3) * Math.PI * 0.5;
                 const yOff = Math.sin(latAngle) * globeR;
@@ -1258,21 +1290,171 @@
                 if (latR < 5) continue;
                 gl.beginPath();
                 gl.ellipse(globeCx, globeCy + yOff, latR, latR * 0.15, 0, 0, Math.PI * 2);
-                gl.strokeStyle = `rgba(196,30,42,${globeA * 0.08})`;
-                gl.lineWidth = 0.5;
+                gl.strokeStyle = `rgba(196,30,42,${globeA * 0.03})`;
+                gl.lineWidth = 0.3;
                 gl.stroke();
             }
 
-            // Longitude lines (vertical ellipses that rotate)
-            for (let lon = 0; lon < 6; lon++) {
-                const lonAngle = rotation + (lon / 6) * Math.PI;
-                const xScale = Math.cos(lonAngle);
+            // ─── EARTH CONTINENT POINT CLOUD ───
+            // Encoded as [lat, lon] pairs in degrees. Simplified coastlines.
+            // North America
+            const continentData = [
+              // North America — outline
+              [72,-168],[71,-156],[70,-142],[68,-135],[62,-141],[60,-147],[57,-153],[55,-162],[52,-170],
+              [65,-168],[70,-162],[68,-150],[64,-140],[60,-140],[56,-132],[52,-128],[49,-125],
+              [48,-123],[46,-124],[43,-124],[40,-124],[37,-122],[34,-120],[32,-117],[30,-114],
+              [28,-112],[26,-110],[24,-108],[22,-106],[20,-105],[18,-103],[16,-95],[15,-90],
+              [15,-87],[18,-88],[20,-90],[22,-97],[24,-97],[26,-97],[28,-97],[30,-96],
+              [30,-93],[28,-90],[30,-88],[30,-85],[25,-80],[27,-82],[30,-81],[32,-80],
+              [34,-78],[36,-76],[38,-75],[40,-74],[41,-72],[43,-70],[44,-68],[46,-67],
+              [45,-62],[47,-56],[48,-53],[50,-56],[52,-56],[55,-60],[53,-64],[47,-65],
+              [49,-68],[48,-72],[46,-76],[44,-80],[42,-82],[40,-84],[38,-87],[36,-90],
+              [34,-94],[32,-96],[30,-97],[28,-97],
+              // Central America
+              [20,-87],[18,-88],[16,-89],[14,-87],[12,-84],[10,-84],[9,-80],[8,-77],
+              [10,-75],[12,-72],[10,-68],[11,-62],[10,-61],[9,-60],
+              // South America
+              [12,-72],[10,-76],[7,-78],[4,-78],[2,-80],[0,-80],[-2,-80],[-4,-81],[-5,-80],
+              [-4,-78],[-2,-75],[0,-70],[2,-67],[4,-60],[7,-58],[10,-62],[12,-72],
+              [-5,-80],[-8,-79],[-10,-78],[-12,-77],[-14,-76],[-16,-75],[-18,-72],[-20,-70],
+              [-23,-70],[-24,-65],[-27,-66],[-28,-65],[-30,-62],[-33,-60],[-35,-57],[-38,-57],
+              [-40,-62],[-42,-64],[-44,-66],[-46,-68],[-48,-70],[-50,-72],[-52,-70],[-54,-68],
+              [-55,-66],[-54,-64],[-52,-69],[-50,-74],[-48,-75],[-46,-75],[-44,-72],[-42,-68],
+              [-40,-65],[-38,-60],[-36,-57],[-34,-53],[-32,-52],[-28,-49],[-26,-48],[-22,-42],
+              [-18,-40],[-14,-38],[-12,-37],[-8,-35],[-4,-34],[-2,-44],[0,-50],[2,-52],[5,-54],
+              [8,-58],[10,-64],[12,-72],
+              // Fill points — South America interior
+              [-5,-60],[-10,-55],[-15,-55],[-20,-55],[-15,-65],[-10,-65],[-5,-70],[0,-65],
+              [-8,-50],[-12,-48],[-16,-48],[-20,-50],[-24,-55],[-28,-55],[-32,-55],[-25,-60],
+              [-18,-60],[-10,-60],[0,-60],[-3,-55],[-6,-48],[-10,-42],[-14,-44],[-18,-46],
+              [-22,-48],[-26,-52],[-30,-55],[-34,-56],[-36,-60],[-38,-62],[-40,-64],
+              // Fill points — North America interior
+              [48,-100],[46,-100],[44,-100],[42,-100],[40,-100],[38,-100],[36,-98],[34,-98],
+              [48,-95],[46,-95],[44,-95],[42,-95],[40,-95],[38,-95],[36,-95],[34,-95],
+              [48,-90],[46,-90],[44,-90],[42,-90],[40,-90],[38,-90],[36,-90],
+              [48,-85],[46,-85],[44,-85],[42,-85],[40,-85],
+              [48,-110],[46,-110],[44,-110],[42,-110],[40,-110],[38,-108],[36,-106],[34,-104],
+              [50,-105],[52,-110],[54,-115],[56,-120],[58,-125],[55,-130],[50,-120],[48,-115],
+              [46,-105],[44,-105],[42,-105],[40,-105],[38,-105],[36,-102],
+              [60,-110],[58,-108],[56,-108],[54,-108],[62,-115],[60,-120],[58,-130],
+              [32,-100],[30,-100],[28,-98],[26,-98],[24,-100],[22,-100],
+              [65,-140],[63,-135],[61,-130],[59,-125],[57,-120],[55,-115],[53,-110],[51,-105],
+              // Europe outline
+              [72,25],[70,30],[68,28],[66,25],[64,22],[62,18],[60,12],[58,8],[56,8],[54,10],
+              [52,5],[51,2],[50,-5],[48,-5],[46,-2],[44,0],[42,-2],[40,-4],[38,-5],[36,-6],
+              [36,0],[38,2],[40,4],[42,3],[44,6],[46,8],[48,8],[50,6],[52,6],
+              [54,12],[56,12],[58,14],[60,18],[62,24],[64,28],[66,30],[68,32],[70,32],
+              [42,12],[44,14],[46,14],[48,14],[46,18],[44,18],[42,16],
+              [40,15],[38,12],[36,10],[38,24],[40,20],[42,22],[44,24],[46,20],[48,18],
+              // Europe fill
+              [50,10],[52,12],[54,14],[56,14],[58,16],[60,20],[50,15],[52,18],[54,20],
+              [56,20],[58,22],[48,12],[46,12],[44,10],[42,8],[40,8],
+              [62,20],[60,16],[58,12],[56,10],[54,8],[52,4],[50,0],[48,0],[46,2],[44,4],
+              // Scandinavia
+              [68,16],[66,14],[64,12],[62,10],[60,10],[58,10],[68,20],[66,18],[64,16],
+              [62,14],[70,20],[70,26],[68,24],[66,22],[64,20],
+              // Africa outline
+              [36,10],[34,10],[32,10],[30,10],[28,10],[26,10],[24,8],[22,6],[20,4],[18,2],
+              [16,0],[14,-2],[12,-4],[10,-6],[8,-5],[6,-2],[4,6],[2,10],[0,10],
+              [-2,12],[-4,14],[-6,14],[-8,16],[-10,18],[-12,22],[-14,24],[-16,28],
+              [-18,30],[-20,32],[-22,34],[-24,34],[-26,32],[-28,30],[-30,28],[-32,28],
+              [-34,26],[-34,20],[-32,18],[-30,16],[-28,16],[-26,18],[-24,20],[-22,18],
+              [-20,16],[-18,14],[-16,12],[-14,10],[-12,8],[-10,8],[-8,10],[-6,10],
+              [-4,10],[-2,10],[0,10],
+              [36,36],[34,36],[32,36],[30,35],[28,34],[26,36],[24,38],[22,40],[20,42],
+              [18,44],[16,44],[14,46],[12,48],[10,48],[8,45],[6,42],[4,40],[2,40],
+              [0,38],[-2,36],[-4,34],[-6,30],[-8,26],[-10,22],[-12,20],[-14,18],
+              // Africa fill
+              [10,10],[10,20],[10,30],[10,40],[0,20],[0,30],[-10,20],[-10,30],
+              [20,10],[20,20],[20,30],[20,40],[-20,25],[-20,30],[5,15],[5,25],[5,35],
+              [15,10],[15,20],[15,30],[15,40],[25,15],[25,25],[25,35],[-5,15],[-5,25],
+              [-15,20],[-15,25],[-15,30],[-25,28],[-25,32],[-30,24],[-28,20],[-26,26],
+              // Asia outline
+              [70,40],[70,60],[70,80],[70,100],[70,120],[70,140],[70,160],[70,180],
+              [68,40],[65,60],[62,60],[60,55],[58,50],[56,45],[54,40],[52,40],[50,42],
+              [48,46],[46,48],[44,50],[42,52],[40,54],[38,56],[36,58],[34,60],
+              [30,48],[28,50],[26,52],[24,55],[22,58],[20,60],[18,62],[16,65],[14,70],
+              [12,75],[10,78],[8,80],[6,80],[4,78],[2,76],[0,75],[-2,75],[-4,78],
+              [-6,80],[-8,80],
+              [42,60],[44,65],[46,68],[48,70],[50,72],[52,78],[54,80],[56,84],[58,88],
+              [60,92],[62,100],[64,110],[66,120],[68,130],[68,140],[66,142],[64,140],
+              [62,135],[60,130],[58,128],[56,130],[54,128],[52,125],[50,120],[48,115],
+              [46,110],[44,108],[42,105],[40,110],[38,115],[36,120],[34,125],[32,130],
+              [30,122],[28,118],[26,115],[24,110],[22,106],[20,100],[18,98],
+              // Asia fill — central mass
+              [50,60],[50,70],[50,80],[50,90],[50,100],[50,110],
+              [45,55],[45,65],[45,75],[45,85],[45,95],[45,105],
+              [40,60],[40,70],[40,80],[40,90],[40,100],
+              [35,60],[35,70],[35,80],[35,90],[35,100],[35,110],[35,120],
+              [30,60],[30,70],[30,80],[30,90],[30,100],[30,110],
+              [55,50],[55,60],[55,70],[55,80],[55,90],[55,100],[55,110],[55,120],
+              [60,60],[60,70],[60,80],[60,90],[60,100],[60,110],[60,120],
+              [65,60],[65,80],[65,100],[65,120],[65,140],
+              [25,60],[25,70],[25,80],[25,90],[20,70],[20,80],[20,90],
+              [15,75],[15,80],[10,80],[10,85],
+              // India
+              [28,75],[26,78],[24,80],[22,82],[20,80],[18,78],[16,80],[14,78],[12,80],
+              [10,76],[8,78],[20,75],[22,76],[24,76],[16,76],[14,76],[12,76],
+              // Japan & Korea
+              [46,130],[44,132],[42,132],[40,130],[38,128],[36,130],[34,132],[32,132],
+              [30,131],[44,140],[42,140],[40,140],[38,140],[36,140],[34,136],
+              // SE Asia / Indonesia
+              [4,102],[2,104],[0,106],[-2,108],[-4,110],[-6,106],[-8,112],[-6,114],
+              [-4,116],[-2,118],[0,110],[2,108],[6,100],[8,98],
+              [-2,100],[0,100],[2,100],[-4,100],[-6,102],[-8,104],
+              // Australia
+              [-12,130],[-14,128],[-16,124],[-18,122],[-20,118],[-22,116],[-24,114],
+              [-26,114],[-28,114],[-30,116],[-32,118],[-34,118],[-36,138],[-34,140],
+              [-32,142],[-30,148],[-28,150],[-26,152],[-24,152],[-22,150],[-20,148],
+              [-18,146],[-16,145],[-14,142],[-12,140],[-12,136],[-14,134],[-16,132],
+              [-18,128],[-20,124],[-22,120],[-24,118],
+              // Australia fill
+              [-20,130],[-22,130],[-24,130],[-26,130],[-28,130],[-30,130],[-32,130],
+              [-20,135],[-22,135],[-24,135],[-26,135],[-28,135],[-30,135],[-32,135],
+              [-20,140],[-22,140],[-24,140],[-26,140],[-28,140],[-30,140],
+              [-18,130],[-16,130],[-14,135],[-16,135],[-18,135],
+              [-26,120],[-28,120],[-24,120],[-22,125],[-24,125],[-26,125],[-28,125],[-30,125],
+            ];
+
+            // Render continent points as dot cloud on rotating sphere
+            const degToRad = Math.PI / 180;
+            for (let ci2 = 0; ci2 < continentData.length; ci2++) {
+                const [latDeg, lonDeg] = continentData[ci2];
+                const latR2 = latDeg * degToRad;
+                const lonR2 = lonDeg * degToRad + rotation;
+
+                // 3D sphere projection
+                const cosLat = Math.cos(latR2);
+                const x3d = cosLat * Math.sin(lonR2);
+                const y3d = -Math.sin(latR2);
+                const z3d = cosLat * Math.cos(lonR2);
+
+                // Front-face culling — only show points facing us
+                if (z3d < -0.05) continue;
+
+                const screenX = globeCx + x3d * globeR;
+                const screenY = globeCy + y3d * globeR;
+                const depthA = 0.15 + z3d * 0.85; // brighter when facing camera
+
+                // Dot size varies by depth for parallax
+                const dotSize = 1.0 + z3d * 1.0;
+                const shimmer = Math.sin(lt * 2.5 + ci2 * 0.07) * 0.08 + 0.92;
+
                 gl.beginPath();
-                gl.ellipse(globeCx, globeCy, Math.abs(xScale) * globeR, globeR, 0, 0, Math.PI * 2);
-                gl.strokeStyle = `rgba(196,30,42,${globeA * 0.06 * (0.3 + Math.abs(xScale) * 0.7)})`;
-                gl.lineWidth = 0.5;
-                gl.stroke();
+                gl.arc(screenX, screenY, dotSize, 0, Math.PI * 2);
+                gl.fillStyle = `rgba(196,30,42,${globeA * depthA * shimmer * 0.75})`;
+                gl.fill();
             }
+
+            // Atmosphere edge glow — makes the globe feel solid
+            const atmosGrad = gl.createRadialGradient(globeCx, globeCy, globeR * 0.85, globeCx, globeCy, globeR * 1.05);
+            atmosGrad.addColorStop(0, 'rgba(196,30,42,0)');
+            atmosGrad.addColorStop(0.5, `rgba(196,30,42,${globeA * 0.04})`);
+            atmosGrad.addColorStop(1, 'rgba(196,30,42,0)');
+            gl.fillStyle = atmosGrad;
+            gl.beginPath();
+            gl.arc(globeCx, globeCy, globeR * 1.05, 0, Math.PI * 2);
+            gl.fill();
 
             // CONNECTION NODES on globe surface — cities / lead clusters
             const cities = [
