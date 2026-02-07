@@ -126,8 +126,6 @@
         const h = sz * Math.sqrt(3);
         const cols = Math.ceil(W / (sz * 1.5)) + 2;
         const rows = Math.ceil(H / h) + 2;
-        gl.strokeStyle = `rgba(196,30,42,${alpha * 0.08})`;
-        gl.lineWidth = 0.5;
         for (let r = -1; r < rows; r++) {
             for (let c2 = -1; c2 < cols; c2++) {
                 const cx = c2 * sz * 1.5;
@@ -135,6 +133,7 @@
                 const dist = Math.hypot(cx - W/2, cy - H/2) / (W * 0.5);
                 const pAlpha = Math.max(0, 1 - dist) * (0.7 + Math.sin(pulse + dist * 4) * 0.3);
                 gl.strokeStyle = `rgba(196,30,42,${alpha * 0.06 * pAlpha})`;
+                gl.lineWidth = 0.5;
                 gl.beginPath();
                 for (let s2 = 0; s2 < 6; s2++) {
                     const a2 = Math.PI / 3 * s2;
@@ -148,26 +147,24 @@
     }
 
     // ─── PERSISTENT NEURAL NETWORK — grows throughout trailer like a brain building itself ───
-    const BRAIN_N = 120; // neurons
+    const BRAIN_N = 120;
     const bx=new Float32Array(BRAIN_N), by=new Float32Array(BRAIN_N),
           bvx=new Float32Array(BRAIN_N), bvy=new Float32Array(BRAIN_N),
-          bBorn=new Float32Array(BRAIN_N); // birth time (in global t)
+          bBorn=new Float32Array(BRAIN_N);
     for(let i=0;i<BRAIN_N;i++){
         bx[i]=Math.random()*2-1; by[i]=Math.random()*2-1;
         bvx[i]=(Math.random()-.5)*.001; bvy[i]=(Math.random()-.5)*.001;
-        bBorn[i] = i * 0.5 + Math.random() * 0.5; // staggered birth across trailer
+        bBorn[i] = i * 0.5 + Math.random() * 0.5;
     }
 
     function drawBrainNet(globalT, alpha) {
         if (alpha <= 0) return;
         const activeCount = Math.min(BRAIN_N, Math.floor(globalT * 1.8));
-        // Update positions
         for (let i = 0; i < activeCount; i++) {
             bx[i] += bvx[i]; by[i] += bvy[i];
             if(Math.abs(bx[i])>1.05) bvx[i]*=-1;
             if(Math.abs(by[i])>1.05) bvy[i]*=-1;
         }
-        // Draw connections — synapses forming
         for (let i = 0; i < activeCount; i++) {
             const xi = (bx[i]*.5+.5)*W, yi = (by[i]*.5+.5)*H;
             for (let j = i+1; j < activeCount; j++) {
@@ -176,13 +173,11 @@
                 const maxD = W * 0.15;
                 if (d > maxD) continue;
                 const strength = (1 - d/maxD);
-                // Signal pulse traveling along synapse
                 const pulse = Math.sin(globalT * 4 + i * 0.5 + j * 0.3) * 0.5 + 0.5;
                 gl.beginPath(); gl.moveTo(xi, yi); gl.lineTo(xj, yj);
                 gl.strokeStyle = `rgba(196,30,42,${alpha * strength * 0.12 * (0.5 + pulse * 0.5)})`;
                 gl.lineWidth = strength * 1.2;
                 gl.stroke();
-                // Traveling signal dot
                 if (strength > 0.5 && pulse > 0.7) {
                     const sp2 = (globalT * 0.8 + i * 0.1) % 1;
                     const sx = lerp(xi, xj, sp2), sy = lerp(yi, yj, sp2);
@@ -192,18 +187,15 @@
                 }
             }
         }
-        // Draw neurons — appearing one by one
         for (let i = 0; i < activeCount; i++) {
             const xi = (bx[i]*.5+.5)*W, yi = (by[i]*.5+.5)*H;
             const age = globalT - bBorn[i];
-            const birthAlpha = clamp(age / 1.5); // fade in over 1.5s
+            const birthAlpha = clamp(age / 1.5);
             const pulse = Math.sin(globalT * 2.5 + i * 1.1) * 0.4 + 0.6;
             const r = 1.5 + pulse * 1.5;
-            // Neuron body
             gl.beginPath(); gl.arc(xi, yi, r, 0, Math.PI*2);
             gl.fillStyle = `rgba(196,30,42,${alpha * birthAlpha * (0.25 + pulse * 0.35)})`;
             gl.fill();
-            // Dendrite glow
             if (birthAlpha > 0.5) {
                 const dg = gl.createRadialGradient(xi,yi,0,xi,yi,r*6);
                 dg.addColorStop(0, `rgba(196,30,42,${alpha * birthAlpha * 0.06})`);
@@ -214,16 +206,89 @@
         }
     }
 
-    // ─── ANIMATED TEXT REVEAL — letter by letter with neural connections ───
-    function drawTextReveal(text, cx, cy, fontSize, alpha, revealProgress, isRed) {
+    // ─── ALIVE LAYER — constant buzzing, pulsing energy across ALL scenes ───
+    function drawAliveLayer(t, intensity) {
+        if (intensity <= 0) return;
+
+        // 1. Heartbeat pulse — screen-wide red flash in rhythm
+        const heartbeat = Math.pow(Math.max(0, Math.sin(t * 1.8)), 12);
+        const hbGlow = gl.createRadialGradient(W/2, H/2, 0, W/2, H/2, W*0.7);
+        hbGlow.addColorStop(0, `rgba(196,30,42,${heartbeat * intensity * 0.06})`);
+        hbGlow.addColorStop(1, 'rgba(0,0,0,0)');
+        gl.fillStyle = hbGlow;
+        gl.fillRect(0, 0, W, H);
+
+        // 2. Edge energy sparks — tiny electric arcs at screen borders
+        for (let i = 0; i < 12; i++) {
+            const seed = Math.sin(t * 17.3 + i * 91.7);
+            if (seed < 0.3) continue;
+            const edge = (i * 7 + Math.floor(t * 3)) % 4;
+            let sx, sy, ex, ey;
+            const len = 15 + seed * 35;
+            const pos = ((t * 0.1 + i * 0.37) % 1);
+            if (edge === 0) { sx = pos*W; sy = 0; ex = sx + (seed-0.5)*len*2; ey = len; }
+            else if (edge === 1) { sx = pos*W; sy = H; ex = sx + (seed-0.5)*len*2; ey = H-len; }
+            else if (edge === 2) { sx = 0; sy = pos*H; ex = len; ey = sy + (seed-0.5)*len*2; }
+            else { sx = W; sy = pos*H; ex = W-len; ey = sy + (seed-0.5)*len*2; }
+            gl.beginPath(); gl.moveTo(sx, sy); gl.lineTo(ex, ey);
+            gl.strokeStyle = `rgba(196,30,42,${intensity * seed * 0.2})`;
+            gl.lineWidth = 0.5;
+            gl.stroke();
+        }
+
+        // 3. Pulsing corner brackets — targeting reticle
+        const bracketSz = 25;
+        const bA = intensity * (0.12 + Math.sin(t * 2.5) * 0.04);
+        gl.strokeStyle = `rgba(196,30,42,${bA})`;
+        gl.lineWidth = 1;
+        gl.beginPath(); gl.moveTo(20, 20+bracketSz); gl.lineTo(20, 20); gl.lineTo(20+bracketSz, 20); gl.stroke();
+        gl.beginPath(); gl.moveTo(W-20-bracketSz, 20); gl.lineTo(W-20, 20); gl.lineTo(W-20, 20+bracketSz); gl.stroke();
+        gl.beginPath(); gl.moveTo(20, H-20-bracketSz); gl.lineTo(20, H-20); gl.lineTo(20+bracketSz, H-20); gl.stroke();
+        gl.beginPath(); gl.moveTo(W-20-bracketSz, H-20); gl.lineTo(W-20, H-20); gl.lineTo(W-20, H-20-bracketSz); gl.stroke();
+
+        // 4. Micro-glitch scan bars
+        const glitchSeed = Math.sin(t * 47.1 + frame * 0.1);
+        if (glitchSeed > 0.92) {
+            const gy = (Math.sin(t * 137.3) * 0.5 + 0.5) * H;
+            gl.fillStyle = `rgba(196,30,42,${intensity * 0.06})`;
+            gl.fillRect(0, gy, W, 1 + Math.random() * 2);
+        }
+
+        // 5. Bottom system status pulse bar
+        const statusPulse = Math.sin(t * 4) * 0.5 + 0.5;
+        gl.fillStyle = `rgba(196,30,42,${intensity * 0.12 * statusPulse})`;
+        gl.fillRect(0, H-1, W * (0.15 + statusPulse * 0.08), 1);
+
+        // 6. Ambient energy motes — floating micro-particles
+        for (let i = 0; i < 30; i++) {
+            const mx = ((Math.sin(t * 0.3 + i * 7.1) * 0.5 + 0.5)) * W;
+            const my = ((Math.cos(t * 0.2 + i * 4.3) * 0.5 + 0.5)) * H;
+            const mPulse = Math.sin(t * 3 + i * 2.1) * 0.5 + 0.5;
+            gl.beginPath(); gl.arc(mx, my, 0.5 + mPulse, 0, Math.PI*2);
+            gl.fillStyle = `rgba(196,30,42,${intensity * mPulse * 0.1})`;
+            gl.fill();
+        }
+
+        // 7. Horizontal scan sweep — slow moving scan line
+        const scanPos = ((t * 0.04) % 1) * H;
+        const scanGrad = gl.createLinearGradient(0, scanPos - 15, 0, scanPos + 15);
+        scanGrad.addColorStop(0, 'rgba(196,30,42,0)');
+        scanGrad.addColorStop(0.5, `rgba(196,30,42,${intensity * 0.03})`);
+        scanGrad.addColorStop(1, 'rgba(196,30,42,0)');
+        gl.fillStyle = scanGrad;
+        gl.fillRect(0, scanPos - 15, W, 30);
+    }
+
+    // ─── ANIMATED TEXT REVEAL — letter by letter with correct .Ai coloring ───
+    function drawTextReveal(text, cx, cy, fontSize, alpha, revealProgress) {
         gl.font = `300 ${fontSize}px Inter, sans-serif`;
-        gl.textAlign = 'center';
+        gl.textAlign = 'left';
         gl.textBaseline = 'middle';
         const fullWidth = gl.measureText(text).width;
         const charCount = text.length;
         const revealedChars = Math.floor(revealProgress * charCount);
+        const dotIndex = text.indexOf('.');
 
-        // Measure individual character positions
         let xPos = cx - fullWidth / 2;
         for (let i = 0; i < charCount; i++) {
             const ch = text[i];
@@ -231,53 +296,64 @@
             const charCx = xPos + cw / 2;
 
             if (i < revealedChars) {
-                // Fully revealed
                 const charAge = (revealProgress * charCount - i) / charCount;
                 const charAlpha = clamp(charAge * 8);
 
-                // Character glow during reveal
-                if (charAge < 0.15) {
-                    const glowA = (1 - charAge / 0.15) * alpha;
-                    const cg = gl.createRadialGradient(charCx, cy, 0, charCx, cy, fontSize);
-                    cg.addColorStop(0, `rgba(196,30,42,${glowA * 0.15})`);
+                // Character glow burst on reveal
+                if (charAge < 0.2) {
+                    const glowA = (1 - charAge / 0.2) * alpha;
+                    const cg = gl.createRadialGradient(charCx, cy, 0, charCx, cy, fontSize * 1.2);
+                    cg.addColorStop(0, `rgba(196,30,42,${glowA * 0.2})`);
                     cg.addColorStop(1, 'rgba(196,30,42,0)');
                     gl.fillStyle = cg;
-                    gl.fillRect(charCx - fontSize, cy - fontSize, fontSize * 2, fontSize * 2);
+                    gl.fillRect(charCx - fontSize*1.2, cy - fontSize*1.2, fontSize*2.4, fontSize*2.4);
                 }
 
                 gl.font = `300 ${fontSize}px Inter, sans-serif`;
                 gl.textAlign = 'left';
                 gl.textBaseline = 'middle';
-                if (isRed && (ch === '.' || text.substring(i).startsWith('.Ai'))) {
+                // Color everything from the dot onward in red
+                if (dotIndex >= 0 && i >= dotIndex) {
                     gl.fillStyle = `rgba(196,30,42,${alpha * charAlpha})`;
                 } else {
                     gl.fillStyle = `rgba(245,245,247,${alpha * charAlpha * 0.9})`;
                 }
                 gl.fillText(ch, xPos, cy);
 
-                // Neural connection from this char to next
-                if (i < revealedChars - 1 && i < charCount - 1) {
-                    const nextCw = gl.measureText(text[i+1]).width;
-                    const nextCx = xPos + cw + nextCw / 2;
-                    const connAlpha = alpha * charAlpha * 0.08;
+                // Spark between chars during reveal
+                if (i < revealedChars - 1 && charAge < 0.3) {
+                    const sparkA = (1 - charAge / 0.3) * alpha * 0.15;
                     gl.beginPath();
-                    gl.moveTo(charCx + cw * 0.3, cy);
-                    gl.lineTo(nextCx - nextCw * 0.3 + cw, cy);
-                    gl.strokeStyle = `rgba(196,30,42,${connAlpha})`;
+                    gl.moveTo(xPos + cw, cy);
+                    gl.lineTo(xPos + cw + 3, cy + (Math.sin(frame*0.3+i)*3));
+                    gl.strokeStyle = `rgba(196,30,42,${sparkA})`;
                     gl.lineWidth = 0.5;
                     gl.stroke();
                 }
             } else if (i === revealedChars) {
-                // Currently revealing — cursor/spark
-                const sparkPulse = Math.sin(frame * 0.15) * 0.5 + 0.5;
-                gl.beginPath(); gl.arc(charCx, cy, 3 + sparkPulse * 2, 0, Math.PI * 2);
-                gl.fillStyle = `rgba(196,30,42,${alpha * 0.6})`;
+                // Typing cursor / spark
+                const sparkPulse = Math.sin(frame * 0.2) * 0.5 + 0.5;
+                const sparkR = 4 + sparkPulse * 3;
+                gl.beginPath(); gl.arc(charCx, cy, sparkR, 0, Math.PI * 2);
+                gl.fillStyle = `rgba(196,30,42,${alpha * 0.7})`;
                 gl.fill();
-                const sg = gl.createRadialGradient(charCx, cy, 0, charCx, cy, 20);
-                sg.addColorStop(0, `rgba(196,30,42,${alpha * 0.2})`);
+                // Glow around cursor
+                const sg = gl.createRadialGradient(charCx, cy, 0, charCx, cy, 30);
+                sg.addColorStop(0, `rgba(196,30,42,${alpha * 0.25})`);
                 sg.addColorStop(1, 'rgba(196,30,42,0)');
                 gl.fillStyle = sg;
-                gl.fillRect(charCx - 20, cy - 20, 40, 40);
+                gl.fillRect(charCx - 30, cy - 30, 60, 60);
+                // Electric tendrils from cursor
+                for (let tt = 0; tt < 4; tt++) {
+                    const ang = (frame * 0.05 + tt * Math.PI/2);
+                    const tLen = 10 + sparkPulse * 15;
+                    gl.beginPath();
+                    gl.moveTo(charCx, cy);
+                    gl.lineTo(charCx + Math.cos(ang)*tLen, cy + Math.sin(ang)*tLen);
+                    gl.strokeStyle = `rgba(196,30,42,${alpha * 0.12})`;
+                    gl.lineWidth = 0.5;
+                    gl.stroke();
+                }
             }
             xPos += cw;
         }
@@ -296,7 +372,7 @@
                     Math.sin(nx2 * 3.7 + t * 1.3) *
                     Math.sin(nx2 * 12 + t * 5 + l) * 0.3 +
                     Math.sin(nx2 * 5 + t * 2.1 + l * 0.3) * 0.5;
-                const env = Math.sin(nx2 * Math.PI); // envelope — zero at edges
+                const env = Math.sin(nx2 * Math.PI);
                 const y = yOff + wave * env * H * 0.3 * intensity;
                 x === 0 ? gl.moveTo(x, y) : gl.lineTo(x, y);
             }
@@ -369,7 +445,6 @@
     // ─── FLOW SYSTEM (Call Processing) ───
     function drawProcessFlow(x, y, w, steps, litCount, alpha) {
         const spacing = w / (steps.length - 1);
-        // Connection lines
         for (let i = 0; i < steps.length - 1; i++) {
             const x1 = x + i * spacing, x2 = x + (i+1) * spacing;
             const lit = i < litCount;
@@ -379,7 +454,6 @@
                 : `rgba(50,50,50,${alpha*0.2})`;
             gl.lineWidth = lit ? 1.5 : 0.5;
             gl.stroke();
-            // Pulse particle on active connection
             if (lit && i === litCount - 1) {
                 const px2 = lerp(x1+30, x2-30, (frame*0.02)%1);
                 gl.beginPath(); gl.arc(px2, y, 3, 0, Math.PI*2);
@@ -387,11 +461,9 @@
                 gl.fill();
             }
         }
-        // Nodes
         steps.forEach((s2, i) => {
             const nx2 = x + i * spacing;
             const lit = i <= litCount;
-            // Outer ring
             gl.beginPath(); gl.arc(nx2, y, 18, 0, Math.PI*2);
             gl.strokeStyle = lit
                 ? `rgba(196,30,42,${alpha*0.7})`
@@ -402,18 +474,15 @@
                 gl.beginPath(); gl.arc(nx2, y, 18, 0, Math.PI*2);
                 gl.fillStyle = `rgba(196,30,42,${alpha*0.06})`;
                 gl.fill();
-                // Inner dot
                 gl.beginPath(); gl.arc(nx2, y, 4, 0, Math.PI*2);
                 gl.fillStyle = `rgba(196,30,42,${alpha*0.9})`;
                 gl.fill();
-                // Glow
                 const gr = gl.createRadialGradient(nx2,y,0,nx2,y,35);
                 gr.addColorStop(0, `rgba(196,30,42,${alpha*0.1})`);
                 gr.addColorStop(1, 'rgba(196,30,42,0)');
                 gl.fillStyle = gr;
                 gl.fillRect(nx2-35, y-35, 70, 70);
             }
-            // Label below
             gl.font = '8px Inter, sans-serif';
             gl.textAlign = 'center';
             gl.fillStyle = lit
@@ -447,7 +516,6 @@
         gl.strokeStyle = `rgba(196,30,42,${alpha*0.6})`;
         gl.lineWidth = 1.5;
         gl.stroke();
-        // Fill under
         gl.lineTo(x+w, y+h); gl.lineTo(x, y+h); gl.closePath();
         const gf = gl.createLinearGradient(x,y,x,y+h);
         gf.addColorStop(0, `rgba(196,30,42,${alpha*0.08})`);
@@ -468,7 +536,6 @@
             gl.strokeStyle = `rgba(196,30,42,${alpha * intensity * 0.35})`;
             gl.lineWidth = 0.5;
             gl.strokeRect(x + (w-sw)/2, sy, sw, sh);
-            // Value
             gl.font = '9px Inter, sans-serif';
             gl.textAlign = 'center';
             gl.fillStyle = `rgba(245,245,247,${alpha*0.6})`;
@@ -495,7 +562,6 @@
         ];
         const vis = Math.min(lines.length, Math.floor(t * 2.8));
         const bx = W/2 - 240, by = H/2 - 130;
-        // Terminal background
         gl.fillStyle = `rgba(10,10,10,${alpha*0.5})`;
         gl.strokeStyle = `rgba(196,30,42,${alpha*0.1})`;
         gl.lineWidth = 0.5;
@@ -510,7 +576,6 @@
             gl.fillStyle = l.c === 'red' ? `rgba(196,30,42,${alpha*0.9})`
                 : l.c === 'lit' ? `rgba(245,245,247,${alpha*0.7})`
                 : `rgba(120,120,120,${alpha*0.45})`;
-            // Animate progress bars
             let txt = l.t;
             if (l.t.includes('[') && l.t.includes(']')) {
                 const prog = Math.min(1, (t - i*0.35) / 1.5);
@@ -525,11 +590,40 @@
             gl.fillText(txt, bx, by + i * 20);
         });
 
-        // Cursor blink
         if (Math.floor(t*2)%2 === 0 && vis >= lines.length) {
             gl.fillStyle = `rgba(196,30,42,${alpha*0.8})`;
             gl.fillRect(bx, by + vis * 20, 8, 14);
         }
+    }
+
+    // ─── DRAW STATIC NAME — "Adrective.Ai" with .Ai in red, properly positioned ───
+    function drawStaticName(cx, cy, fontSize, alpha) {
+        gl.font = `300 ${fontSize}px Inter, sans-serif`;
+        gl.textAlign = 'left';
+        gl.textBaseline = 'middle';
+        const adrW = gl.measureText('Adrective').width;
+        const dotAiW = gl.measureText('.Ai').width;
+        const fullW = adrW + dotAiW;
+        const startX = cx - fullW / 2;
+
+        // Breathing glow behind text
+        const breathe = Math.sin(frame * 0.03) * 0.3 + 0.7;
+        const tg = gl.createRadialGradient(cx, cy, 0, cx, cy, fullW * 0.6);
+        tg.addColorStop(0, `rgba(196,30,42,${alpha * 0.04 * breathe})`);
+        tg.addColorStop(1, 'rgba(0,0,0,0)');
+        gl.fillStyle = tg;
+        gl.fillRect(cx - fullW*0.6, cy - fontSize, fullW*1.2, fontSize*2);
+
+        // "Adrective" in white
+        gl.font = `300 ${fontSize}px Inter, sans-serif`;
+        gl.textAlign = 'left';
+        gl.textBaseline = 'middle';
+        gl.fillStyle = `rgba(245,245,247,${alpha * 0.9})`;
+        gl.fillText('Adrective', startX, cy);
+
+        // ".Ai" in red
+        gl.fillStyle = `rgba(196,30,42,${alpha * 0.95})`;
+        gl.fillText('.Ai', startX + adrW, cy);
     }
 
     // ─── HUD TEXT SYSTEM ───
@@ -623,39 +717,33 @@
     }
 
     function scheduleAudio() {
-        // Deep foundation hum — entire trailer
         hum(0, 65, 36, 0.07);
         hum(0, 65, 54, 0.035);
         hum(2, 60, 72, 0.02);
 
-        // Scene transition bass hits
         bass(1, 30, 4, 0.1);
         bass(10, 36, 3, 0.12);
         bass(22, 34, 3, 0.12);
         bass(34, 40, 3, 0.14);
         bass(46, 32, 3.5, 0.14);
         bass(54, 38, 2.5, 0.12);
-        bass(60, 28, 5, 0.18);   // Logo — deepest
-        bass(68, 26, 3, 0.15);   // Final
+        bass(60, 28, 5, 0.18);
+        bass(68, 26, 3, 0.15);
 
-        // Heartbeat sub-bass (Ultron pulse)
         for(let i=0;i<25;i++) bass(2+i*2.3, 24, 0.6, 0.05);
 
-        // Synth pads build from scene 3
         pad(22, 42, 48, 0.05);
         pad(22, 42, 72, 0.03);
         pad(34, 30, 96, 0.02);
 
-        // Electrical crackle at key moments
         crackle(0.5, 2, 0.3);
         crackle(9, 1.5, 0.2);
         crackle(21, 1.5, 0.25);
         crackle(33, 1.5, 0.2);
         crackle(45, 1, 0.2);
-        crackle(59, 2, 0.4);  // Before logo
+        crackle(59, 2, 0.4);
         crackle(62, 1, 0.15);
 
-        // Rising tension pad for logo reveal
         if(ac) {
             const o=ac.createOscillator(), g=ac.createGain(), fl=ac.createBiquadFilter();
             o.type='sawtooth';
@@ -670,7 +758,6 @@
         }
     }
 
-    // Last sonar emit time
     let lastSonar = 0;
 
     // ─── RENDER ───
@@ -696,9 +783,9 @@
         // Clear
         gl.fillStyle = '#000'; gl.fillRect(0,0,W,H);
 
-        // ─── PERSISTENT BRAIN NET — grows across ALL scenes like neurons forming ───
+        // ─── PERSISTENT BRAIN NET — grows across scenes 0-5 ───
         if (scene >= 0 && scene <= 5) {
-            const brainAlpha = clamp(t / 20) * 0.25; // slowly builds over first 20s
+            const brainAlpha = clamp(t / 20) * 0.25;
             drawBrainNet(t, brainAlpha);
         }
 
@@ -723,10 +810,8 @@
             for (let i = 0; i < PN; i++) {
                 const sx = (px[i] * 0.5 + 0.5) * W;
                 const sy = (py[i] * 0.5 + 0.5) * H;
-                // Particles drift more as scene progresses
-                px[i] += pvx[i] * stir;
-                py[i] += pvy[i] * stir;
-                // Wrap
+                px[i] += pvx[i] * stir * 1.5;
+                py[i] += pvy[i] * stir * 1.5;
                 if(px[i]>1.1) px[i]=-1.1; if(px[i]<-1.1) px[i]=1.1;
                 if(py[i]>1.1) py[i]=-1.1; if(py[i]<-1.1) py[i]=1.1;
 
@@ -763,7 +848,6 @@
                     gl.lineWidth = 0.5;
                     gl.stroke();
                 }
-                // Neural nodes
                 for (let i = 0; i < NN; i++) {
                     const x = (nx[i]*.5+.5)*W, y = (ny[i]*.5+.5)*H;
                     const pulse = Math.sin(lt * 3 + i) * 0.5 + 0.5;
@@ -782,6 +866,9 @@
                 gl.fillStyle = gr;
                 gl.fillRect(0,0,W,H);
             }
+
+            // ALIVE LAYER
+            drawAliveLayer(t, a * fade(lt, 1, 3));
         }
 
         // ═══════════════════════════════════════════
@@ -792,20 +879,16 @@
             const lt = t - S[1].s;
             const a = fadeIO(p, 0, 0.12, 0.88, 0.12);
 
-            // Hex grid background
             drawHexGrid(a * 0.3, lt * 0.3);
 
-            // MASSIVE full-screen waveform
             const waveIntensity = fade(lt, 0.5, 2);
             drawWaveform(a, lt, waveIntensity);
 
-            // Call processing flow across bottom third
             const flowAlpha = fade(lt, 1.5, 2);
             const steps = ['DETECT', 'CLASSIFY', 'QUALIFY', 'SCHEDULE', 'CONFIRM'];
             const litSteps = Math.floor(lt * 0.55);
             drawProcessFlow(W*0.1, H*0.78, W*0.8, steps, litSteps, a * flowAlpha);
 
-            // Time cycling — always active indicator
             const times = ['02:14 AM', '09:37 AM', '03:51 PM', '11:08 PM'];
             const tIdx = Math.floor(lt * 0.4) % times.length;
             gl.font = '200 13px Inter, sans-serif';
@@ -816,18 +899,17 @@
             gl.fillStyle = `rgba(100,100,100,${a * 0.25})`;
             gl.fillText('SYSTEM ACTIVE', W - 40, 55);
 
-            // Floating particles
             for (let i = 0; i < 400; i++) {
                 const px2 = (px[i]*.5+.5)*W, py2 = (py[i]*.5+.5)*H;
-                px[i] += pvx[i] * 0.5;
-                py[i] += pvy[i] * 0.5;
+                px[i] += pvx[i] * 0.8;
+                py[i] += pvy[i] * 0.8;
                 if(px[i]>1.1) px[i]=-1.1; if(py[i]>1.1) py[i]=1.1;
-                gl.beginPath(); gl.arc(px2, py2, psz[i]*0.6, 0, Math.PI*2);
-                gl.fillStyle = `rgba(196,30,42,${a * 0.05})`;
+                const pulse = Math.sin(lt * 3 + pph[i]) * 0.3 + 0.7;
+                gl.beginPath(); gl.arc(px2, py2, psz[i]*0.6*pulse, 0, Math.PI*2);
+                gl.fillStyle = `rgba(196,30,42,${a * 0.06 * pulse})`;
                 gl.fill();
             }
 
-            // Active calls counter
             const callNum = Math.min(14, Math.floor(lt * 1.3));
             gl.font = '200 11px Inter, sans-serif';
             gl.textAlign = 'right';
@@ -835,6 +917,8 @@
             gl.fillText('CALLS HANDLED', W - 40, H - 60);
             gl.font = '300 28px Inter, sans-serif';
             gl.fillText(String(callNum).padStart(3, '0'), W - 40, H - 32);
+
+            drawAliveLayer(t, a * 0.8);
         }
 
         // ═══════════════════════════════════════════
@@ -845,22 +929,19 @@
             const lt = t - S[2].s;
             const a = fadeIO(p, 0, 0.12, 0.88, 0.12);
 
-            // Hex grid
             drawHexGrid(a * 0.25, lt * 0.4);
 
-            // Sonar rings from center
             if (lt - lastSonar > 1.8) {
                 emitSonar(W/2, H/2);
                 lastSonar = lt;
             }
             updateSonar(a);
 
-            // Center hub — AI Dialer
+            // Center hub
             const hubPulse = Math.sin(lt * 3) * 0.3 + 0.7;
             gl.beginPath(); gl.arc(W/2, H/2, 12, 0, Math.PI*2);
             gl.fillStyle = `rgba(196,30,42,${a * hubPulse * 0.8})`;
             gl.fill();
-            // Hub glow
             const hg = gl.createRadialGradient(W/2,H/2,0,W/2,H/2,80);
             hg.addColorStop(0, `rgba(196,30,42,${a * 0.12})`);
             hg.addColorStop(1, 'rgba(196,30,42,0)');
@@ -876,14 +957,11 @@
                 const ly = H/2 + Math.sin(angle) * orbitR * 0.55;
                 const active = i <= Math.floor(lt * 0.7);
 
-                // Connecting line
                 if (active) {
                     gl.beginPath(); gl.moveTo(W/2, H/2); gl.lineTo(lx, ly);
                     gl.strokeStyle = `rgba(196,30,42,${a * 0.15})`;
                     gl.lineWidth = 0.5;
                     gl.stroke();
-
-                    // Pulse traveling along line
                     const pp = (lt * 0.5 + i * 0.3) % 1;
                     const ppx = lerp(W/2, lx, pp);
                     const ppy = lerp(H/2, ly, pp);
@@ -892,19 +970,18 @@
                     gl.fill();
                 }
 
-                // Lead node
-                gl.beginPath(); gl.arc(lx, ly, active ? 6 : 3, 0, Math.PI*2);
+                const nodePulse = Math.sin(lt * 4 + i * 1.5) * 0.3 + 0.7;
+                gl.beginPath(); gl.arc(lx, ly, active ? 6 * nodePulse : 3, 0, Math.PI*2);
                 gl.fillStyle = active
-                    ? `rgba(196,30,42,${a * 0.7})`
+                    ? `rgba(196,30,42,${a * 0.7 * nodePulse})`
                     : `rgba(50,50,50,${a * 0.3})`;
                 gl.fill();
 
                 if (active) {
                     gl.beginPath(); gl.arc(lx, ly, 14, 0, Math.PI*2);
-                    gl.strokeStyle = `rgba(196,30,42,${a * 0.3})`;
+                    gl.strokeStyle = `rgba(196,30,42,${a * 0.3 * nodePulse})`;
                     gl.lineWidth = 0.5;
                     gl.stroke();
-                    // Tiny label
                     gl.font = '7px Inter, sans-serif';
                     gl.textAlign = 'center';
                     gl.fillStyle = `rgba(245,245,247,${a * 0.3})`;
@@ -912,13 +989,11 @@
                 }
             }
 
-            // Decision tree at bottom
             const treeA = fade(lt, 2, 2);
             const treeSteps = ['CONTACT', 'ENGAGE', 'QUALIFY', 'HANDLE', 'CONVERT', 'BOOK'];
             const litTree = Math.floor(lt * 0.6);
             drawProcessFlow(W*0.08, H*0.85, W*0.84, treeSteps, litTree, a * treeA * 0.7);
 
-            // Stats
             const engaged = Math.min(leadCount, Math.floor(lt * 0.7) + 1);
             gl.font = '8px Inter, sans-serif';
             gl.textAlign = 'right';
@@ -927,6 +1002,8 @@
             gl.font = '300 24px Inter, sans-serif';
             gl.fillStyle = `rgba(196,30,42,${a*0.5})`;
             gl.fillText(String(engaged) + '/' + leadCount, W-40, 66);
+
+            drawAliveLayer(t, a * 0.8);
         }
 
         // ═══════════════════════════════════════════
@@ -937,20 +1014,16 @@
             const lt = t - S[3].s;
             const a = fadeIO(p, 0, 0.12, 0.88, 0.12);
 
-            // Hex grid dim
             drawHexGrid(a * 0.15, lt * 0.2);
 
-            // Live performance chart — full width
             const chartA = fade(lt, 0.5, 2);
             drawLiveChart(40, H*0.15, W-80, H*0.3, lt, a * chartA);
 
-            // Chart label
             gl.font = '8px Inter, sans-serif';
             gl.textAlign = 'left';
             gl.fillStyle = `rgba(100,100,100,${a * 0.3})`;
             gl.fillText('AD PERFORMANCE — REAL-TIME OPTIMIZATION', 40, H*0.13);
 
-            // Conversion funnel — right side
             const funnelA = fade(lt, 1.5, 2);
             const funnelStages = [
                 { w: 1, v: '142,847 IMPRESSIONS' },
@@ -962,7 +1035,6 @@
             const squeeze = clamp(lt / 8);
             drawFunnel(W*0.6, H*0.52, W*0.32, H*0.35, funnelStages, squeeze, a * funnelA);
 
-            // Metrics — left side
             const metA = fade(lt, 2, 2);
             const cpa = Math.max(12, 52 - lt * 4.2).toFixed(0);
             const quality = Math.min(97, 58 + lt * 3.8).toFixed(0);
@@ -972,15 +1044,17 @@
             drawMetricBlock(50, H*0.75, 'RETURN ON AD SPEND', roas + 'x', a * metA, false);
             drawMetricBlock(50, H*0.85, 'BUDGET EFFICIENCY', Math.min(96, 71 + lt * 2.5).toFixed(0) + '%', a * metA, true);
 
-            // Particles
             for (let i = 0; i < 600; i++) {
-                px[i] += pvx[i]*0.3; py[i] += pvy[i]*0.3;
+                px[i] += pvx[i]*0.5; py[i] += pvy[i]*0.5;
                 if(px[i]>1.1) px[i]=-1.1; if(py[i]>1.1) py[i]=1.1;
                 const sx=(px[i]*.5+.5)*W, sy=(py[i]*.5+.5)*H;
-                gl.beginPath(); gl.arc(sx, sy, psz[i]*0.5, 0, Math.PI*2);
-                gl.fillStyle = `rgba(196,30,42,${a * 0.04})`;
+                const pulse = Math.sin(lt * 2 + pph[i]) * 0.3 + 0.7;
+                gl.beginPath(); gl.arc(sx, sy, psz[i]*0.5*pulse, 0, Math.PI*2);
+                gl.fillStyle = `rgba(196,30,42,${a * 0.05 * pulse})`;
                 gl.fill();
             }
+
+            drawAliveLayer(t, a * 0.7);
         }
 
         // ═══════════════════════════════════════════
@@ -991,10 +1065,9 @@
             const lt = t - S[4].s;
             const a = fadeIO(p, 0, 0.15, 0.85, 0.15);
 
-            // Data rain background
             drawDataRain(a * fade(lt, 0.5, 2));
 
-            // Server grid — wider
+            // Server grid
             const cols = 16, rows = 8;
             const sxS = W / (cols + 1), syS = H / (rows + 1);
             for (let r = 0; r < rows; r++) {
@@ -1002,18 +1075,15 @@
                     const sx = sxS * (cc + 1), sy = syS * (r + 1);
                     const rDist = Math.hypot(sx-W/2, sy-H/2) / (W*0.5);
                     const sA = a * (1 - rDist * 0.4) * fade(lt, rDist * 2, 1.5);
-                    // Unit
                     gl.fillStyle = `rgba(15,15,17,${sA*0.8})`;
                     gl.fillRect(sx-22, sy-8, 44, 16);
                     gl.strokeStyle = `rgba(40,40,42,${sA*0.4})`;
                     gl.lineWidth = 0.5;
                     gl.strokeRect(sx-22, sy-8, 44, 16);
-                    // LED
                     const pulse = Math.sin(lt*1.5 + r*0.7 + cc*0.4)*0.3+0.7;
                     gl.beginPath(); gl.arc(sx+16, sy, 1.8, 0, Math.PI*2);
                     gl.fillStyle = `rgba(196,30,42,${sA*pulse})`;
                     gl.fill();
-                    // LED glow
                     const lg = gl.createRadialGradient(sx+16,sy,0,sx+16,sy,10);
                     lg.addColorStop(0, `rgba(196,30,42,${sA*pulse*0.2})`);
                     lg.addColorStop(1, 'rgba(196,30,42,0)');
@@ -1022,7 +1092,7 @@
                 }
             }
 
-            // Architecture overlay — connecting lines
+            // Architecture overlay
             const archA = fade(lt, 2, 3);
             const archNodes = [
                 {x:W*.5,y:H*.2,l:'CORE'}, {x:W*.25,y:H*.4,l:'VOICE'},
@@ -1040,7 +1110,6 @@
                 gl.strokeStyle = `rgba(196,30,42,${a * archA * 0.2})`;
                 gl.lineWidth = 0.8;
                 gl.stroke();
-                // Traveling pulse
                 const pp = (lt*0.3 + idx*0.2) % 1;
                 const ppx = lerp(archNodes[ai].x, archNodes[bi].x, pp);
                 const ppy = lerp(archNodes[ai].y, archNodes[bi].y, pp);
@@ -1051,7 +1120,8 @@
             archNodes.forEach((n,i) => {
                 const litN = i <= Math.floor(lt * 1.2);
                 if (!litN) return;
-                gl.beginPath(); gl.arc(n.x, n.y, 5, 0, Math.PI*2);
+                const pulse = Math.sin(lt * 2.5 + i * 1.3) * 0.3 + 0.7;
+                gl.beginPath(); gl.arc(n.x, n.y, 5 * pulse, 0, Math.PI*2);
                 gl.fillStyle = `rgba(196,30,42,${a * archA * 0.8})`;
                 gl.fill();
                 const ng = gl.createRadialGradient(n.x,n.y,0,n.x,n.y,30);
@@ -1064,6 +1134,8 @@
                 gl.fillStyle = `rgba(245,245,247,${a*archA*0.4})`;
                 gl.fillText(n.l, n.x, n.y + 16);
             });
+
+            drawAliveLayer(t, a * 0.9);
         }
 
         // ═══════════════════════════════════════════
@@ -1074,24 +1146,21 @@
             const lt = t - S[5].s;
             const a = fadeIO(p, 0, 0.12, 0.82, 0.18);
 
-            // Faint hex grid
             drawHexGrid(a * 0.12, lt * 0.2);
-
-            // Data rain behind
             drawDataRain(a * 0.3);
-
-            // Code deployment — center stage
             drawCodeDeploy(a, lt);
 
-            // Particles
             for(let i=0;i<300;i++){
-                px[i]+=pvx[i]*0.3; py[i]+=pvy[i]*0.3;
+                px[i]+=pvx[i]*0.5; py[i]+=pvy[i]*0.5;
                 if(px[i]>1.1) px[i]=-1.1; if(py[i]>1.1) py[i]=1.1;
                 const sx=(px[i]*.5+.5)*W, sy=(py[i]*.5+.5)*H;
-                gl.beginPath(); gl.arc(sx,sy,psz[i]*0.4,0,Math.PI*2);
-                gl.fillStyle = `rgba(245,245,247,${a*0.03})`;
+                const pulse = Math.sin(lt * 2.5 + pph[i]) * 0.3 + 0.7;
+                gl.beginPath(); gl.arc(sx,sy,psz[i]*0.4*pulse,0,Math.PI*2);
+                gl.fillStyle = `rgba(245,245,247,${a*0.04*pulse})`;
                 gl.fill();
             }
+
+            drawAliveLayer(t, a * 0.8);
         }
 
         // ═══════════════════════════════════════════
@@ -1102,78 +1171,119 @@
             const lt = t - S[6].s;
             const a = fadeIO(p, 0, 0.05, 0.92, 0.08);
 
-            // Phase 1 (0-2s): Neural network intensifies, particles converge
-            // Phase 2 (2-5s): "Adrective.Ai" types itself letter by letter
-            // Phase 3 (5-8s): Full text holds, EM pulse, network peaks
+            // Phase 1 (0-3s): Everything converges — neural net peaks, particles swarm inward
+            // Phase 2 (2.5-5.5s): "Adrective.Ai" types letter by letter
+            // Phase 3 (5.5-8s): Full text holds with breathing glow, EM pulse, tagline
 
-            // Dense neural network — the brain fully formed
-            drawBrainNet(t, a * 0.8);
+            // Dense neural network — brain fully formed and pulsing
+            drawBrainNet(t, a * 0.7);
 
-            // Converging particles toward center
-            const convergence = clamp(lt / 3);
-            for (let i = 0; i < 800; i++) {
-                px[i] = lerp(px[i], (Math.random()-.5)*0.3, convergence * 0.015);
-                py[i] = lerp(py[i], (Math.random()-.5)*0.15, convergence * 0.015);
+            // Hex grid — intensified and pulsing
+            const hexPulse = lt * 0.8 + Math.sin(lt * 2) * 0.5;
+            drawHexGrid(a * 0.3 * fade(lt, 0, 2), hexPulse);
+
+            // Converging particles toward center — dense swarm
+            for (let i = 0; i < 1200; i++) {
+                // Pull toward center over time
+                const targetX = (Math.sin(i * 1.7 + lt * 0.2) * 0.2);
+                const targetY = (Math.cos(i * 2.3 + lt * 0.15) * 0.08);
+                const pull = clamp(lt / 4) * 0.02;
+                px[i] = lerp(px[i], targetX, pull);
+                py[i] = lerp(py[i], targetY, pull);
+                px[i] += pvx[i] * 0.8;
+                py[i] += pvy[i] * 0.8;
+
                 const sx = (px[i]*.5+.5)*W, sy = (py[i]*.5+.5)*H;
-                const distC = Math.hypot(sx-W/2, sy-H/2) / (W*0.3);
-                const pA = a * Math.max(0, 1 - distC) * 0.2;
+                const distC = Math.hypot(sx-W/2, sy-H/2) / (W*0.35);
+                const pA = a * Math.max(0, 1 - distC) * 0.25;
+                const pulse = Math.sin(lt * 3 + pph[i]) * 0.4 + 0.6;
                 gl.beginPath();
-                gl.arc(sx, sy, psz[i] * 0.8, 0, Math.PI * 2);
-                gl.fillStyle = `rgba(196,30,42,${pA})`;
+                gl.arc(sx, sy, psz[i] * 0.8 * pulse, 0, Math.PI * 2);
+                gl.fillStyle = i % 8 === 0
+                    ? `rgba(196,30,42,${pA * 1.5 * pulse})`
+                    : `rgba(245,245,247,${pA * 0.4 * pulse})`;
                 gl.fill();
             }
 
-            // Background glow builds
+            // Background glow intensifies
             const bgGlow = clamp(lt / 3);
-            const gr = gl.createRadialGradient(W/2, H/2, 0, W/2, H/2, 300);
-            gr.addColorStop(0, `rgba(196,30,42,${bgGlow * a * 0.12})`);
-            gr.addColorStop(0.5, `rgba(139,26,26,${bgGlow * a * 0.04})`);
+            const gr = gl.createRadialGradient(W/2, H/2, 0, W/2, H/2, W*0.35);
+            gr.addColorStop(0, `rgba(196,30,42,${bgGlow * a * 0.1})`);
+            gr.addColorStop(0.4, `rgba(139,26,26,${bgGlow * a * 0.04})`);
             gr.addColorStop(1, 'rgba(0,0,0,0)');
             gl.fillStyle = gr;
             gl.fillRect(0, 0, W, H);
 
-            // "Adrective.Ai" text reveal — letter by letter
-            const textStart = 2; // seconds into scene
-            const textDur = 3.5; // seconds to type full name
+            // "Adrective.Ai" text reveal — letter by letter with energy
+            const textStart = 2.5;
+            const textDur = 3;
             const textProgress = clamp((lt - textStart) / textDur);
             const textAlpha = fade(lt, textStart, 1);
-            const fontSize = Math.floor(Math.min(W * 0.05, H * 0.08, 64));
+            const fontSize = Math.floor(Math.min(W * 0.055, H * 0.09, 72));
 
             if (textProgress > 0) {
-                drawTextReveal('Adrective.Ai', W/2, H/2, fontSize, textAlpha * a, textProgress, true);
+                drawTextReveal('Adrective.Ai', W/2, H/2, fontSize, textAlpha * a, textProgress);
             }
 
-            // Electromagnetic pulse at text completion
+            // After text is fully revealed — breathing glow under it
+            if (textProgress >= 1) {
+                const breathe = Math.sin(lt * 2) * 0.3 + 0.7;
+                const tg = gl.createRadialGradient(W/2, H/2, 0, W/2, H/2, fontSize * 4);
+                tg.addColorStop(0, `rgba(196,30,42,${a * 0.05 * breathe})`);
+                tg.addColorStop(1, 'rgba(0,0,0,0)');
+                gl.fillStyle = tg;
+                gl.fillRect(0, 0, W, H);
+            }
+
+            // Electromagnetic pulse rings at text completion
             const pulseStart = textStart + textDur + 0.3;
-            const pulseAlpha = clamp((lt - pulseStart) / 0.4) * clamp(1 - (lt - pulseStart - 0.8) / 1);
-            if (pulseAlpha > 0) {
-                const pulseR = (lt - pulseStart) * W * 0.25;
-                for (let ring = 0; ring < 3; ring++) {
-                    const rr = pulseR * (1 - ring * 0.2);
+            const pulseAge = lt - pulseStart;
+            if (pulseAge > 0 && pulseAge < 2) {
+                const pulseAlpha = clamp(pulseAge / 0.3) * clamp(1 - (pulseAge - 0.8) / 1.2);
+                for (let ring = 0; ring < 4; ring++) {
+                    const rr = pulseAge * W * 0.2 * (1 - ring * 0.15);
                     if (rr <= 0) continue;
                     gl.beginPath();
                     gl.arc(W/2, H/2, rr, 0, Math.PI * 2);
-                    gl.strokeStyle = `rgba(196,30,42,${pulseAlpha * a * 0.3 * (1 - ring * 0.3)})`;
-                    gl.lineWidth = 2 - ring * 0.5;
+                    gl.strokeStyle = `rgba(196,30,42,${pulseAlpha * a * 0.25 * (1 - ring * 0.25)})`;
+                    gl.lineWidth = 2 - ring * 0.4;
                     gl.stroke();
                 }
             }
 
-            // Tagline fades in after name
+            // Energy arcs radiating from text center
+            if (lt > textStart) {
+                const arcCount = 6;
+                for (let i = 0; i < arcCount; i++) {
+                    const ang = (lt * 0.3 + i * Math.PI * 2 / arcCount);
+                    const arcLen = 60 + Math.sin(lt * 2 + i) * 30;
+                    const arcA = a * 0.1 * clamp((lt - textStart) / 2);
+                    gl.beginPath();
+                    gl.moveTo(W/2 + Math.cos(ang) * fontSize * 2, H/2 + Math.sin(ang) * fontSize * 0.8);
+                    gl.lineTo(W/2 + Math.cos(ang) * (fontSize * 2 + arcLen), H/2 + Math.sin(ang) * (fontSize * 0.8 + arcLen * 0.3));
+                    gl.strokeStyle = `rgba(196,30,42,${arcA})`;
+                    gl.lineWidth = 0.5;
+                    gl.stroke();
+                }
+            }
+
+            // Tagline fades in after name reveals
             const tagStart = textStart + textDur + 1.5;
             const tagAlpha = fade(lt, tagStart, 1.5) * a;
             if (tagAlpha > 0) {
-                const tagSize = Math.floor(fontSize * 0.35);
+                const tagSize = Math.floor(fontSize * 0.3);
                 gl.font = `200 ${tagSize}px Inter, sans-serif`;
                 gl.textAlign = 'center';
                 gl.textBaseline = 'middle';
-                gl.fillStyle = `rgba(245,245,247,${tagAlpha * 0.45})`;
-                gl.fillText('AUTONOMOUS GROWTH. ENGINEERED.', W/2, H/2 + fontSize * 0.9);
+                gl.fillStyle = `rgba(245,245,247,${tagAlpha * 0.5})`;
+                gl.fillText('AUTONOMOUS GROWTH. ENGINEERED.', W/2, H/2 + fontSize * 1.0);
             }
+
+            drawAliveLayer(t, a * 0.9);
         }
 
         // ═══════════════════════════════════════════
-        // SCENE 7: CLOSE — Name, silence, fade
+        // SCENE 7: CLOSE — Name holds, silence, fade to black
         // ═══════════════════════════════════════════
         else if (scene === 7) {
             const p = sp(t, 7);
@@ -1181,30 +1291,28 @@
 
             // Fading neural network behind
             const netA = fadeO(lt, 0.5, 2.5);
-            drawBrainNet(t, netA * 0.3);
+            drawBrainNet(t, netA * 0.25);
 
-            // "Adrective.Ai" text holds then fades
-            const nameA = fadeO(lt, 1, 2);
+            // Subtle hex grid fading
+            drawHexGrid(netA * 0.1, lt * 0.3);
+
+            // "Adrective.Ai" — holds then fades
+            const nameA = fadeO(lt, 1.5, 2);
             if (nameA > 0) {
-                const fontSize = Math.floor(Math.min(W * 0.05, H * 0.08, 64));
-                gl.font = `300 ${fontSize}px Inter, sans-serif`;
+                const fontSize = Math.floor(Math.min(W * 0.055, H * 0.09, 72));
+                drawStaticName(W/2, H/2 - fontSize * 0.3, fontSize, nameA);
+
+                // Tagline beneath
+                const tagSize = Math.floor(fontSize * 0.3);
+                gl.font = `200 ${tagSize}px Inter, sans-serif`;
                 gl.textAlign = 'center';
                 gl.textBaseline = 'middle';
-                gl.fillStyle = `rgba(245,245,247,${nameA * 0.85})`;
-                gl.fillText('Adrective', W/2 - gl.measureText('.Ai').width/2, H/2 - 20);
-                gl.fillStyle = `rgba(196,30,42,${nameA * 0.9})`;
-                gl.fillText('.Ai', W/2 + gl.measureText('Adrective').width/2 - gl.measureText('.Ai').width/2, H/2 - 20);
-
-                // Tagline
-                const tagSize = Math.floor(fontSize * 0.32);
-                gl.font = `200 ${tagSize}px Inter, sans-serif`;
-                gl.fillStyle = `rgba(245,245,247,${nameA * 0.35})`;
-                gl.fillText('AUTONOMOUS GROWTH. ENGINEERED.', W/2, H/2 + fontSize * 0.6);
+                gl.fillStyle = `rgba(245,245,247,${nameA * 0.4})`;
+                gl.fillText('AUTONOMOUS GROWTH. ENGINEERED.', W/2, H/2 + fontSize * 0.7);
             }
 
             // Founder credit — Jacques Lev
-            const creditStart = 1.5;
-            const creditA = fadeIO(lt, creditStart, 1.5, 3, 1) ;
+            const creditA = fadeIO(lt, 1.5, 1.5, 3, 1);
             if (creditA > 0) {
                 gl.font = '200 10px Inter, sans-serif';
                 gl.textAlign = 'center';
@@ -1213,7 +1321,7 @@
                 gl.fillText('FOUNDED BY JACQUES LEV', W/2, H * 0.72);
             }
 
-            // Fading glow
+            // Fading ambient glow
             const glowA = fadeO(lt, 0.5, 3);
             const gr = gl.createRadialGradient(W/2, H/2, 0, W/2, H/2, 200);
             gr.addColorStop(0, `rgba(196,30,42,${glowA * 0.05})`);
@@ -1221,9 +1329,23 @@
             gl.fillStyle = gr;
             gl.fillRect(0, 0, W, H);
 
-            // Final fade to black
-            if (lt > 3) {
-                const bk = clamp((lt - 3) / 1);
+            // Alive layer fading out
+            drawAliveLayer(t, glowA * 0.4);
+
+            // Drifting particles — dying embers
+            for (let i = 0; i < 200; i++) {
+                px[i] += pvx[i] * 0.2;
+                py[i] += pvy[i] * 0.2;
+                const sx = (px[i]*.5+.5)*W, sy = (py[i]*.5+.5)*H;
+                const pulse = Math.sin(lt * 1.5 + pph[i]) * 0.4 + 0.6;
+                gl.beginPath(); gl.arc(sx, sy, psz[i]*0.3*pulse, 0, Math.PI*2);
+                gl.fillStyle = `rgba(196,30,42,${glowA * 0.04 * pulse})`;
+                gl.fill();
+            }
+
+            // Final fade to absolute black
+            if (lt > 2.5) {
+                const bk = clamp((lt - 2.5) / 1.5);
                 gl.fillStyle = `rgba(0,0,0,${bk})`;
                 gl.fillRect(0, 0, W, H);
             }
@@ -1258,7 +1380,6 @@
         playBtn.style.display = 'none';
         playing = true; scene = -1; frame = 0; lastSonar = 0;
         t0 = performance.now();
-        // Reset particles
         for(let i=0;i<PN;i++){
             px[i]=Math.random()*2-1; py[i]=Math.random()*2-1;
         }
