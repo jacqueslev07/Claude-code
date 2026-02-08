@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adrective.Ai — IG Story</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500&family=Orbitron:wght@400;500;600;700;800&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #000; overflow: hidden; cursor: none; }
+        canvas { display: block; }
+        #overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            z-index: 10; background: #000;
+            transition: opacity 0.8s ease;
+        }
+        #startBtn {
+            padding: 16px 52px;
+            background: transparent;
+            border: 1px solid rgba(196,30,42,0.25);
+            color: rgba(245,245,247,0.6);
+            font: 300 13px 'Inter', sans-serif;
+            letter-spacing: 6px;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: all 0.4s ease;
+        }
+        #startBtn:hover {
+            border-color: rgba(196,30,42,0.6);
+            color: rgba(245,245,247,0.9);
+            box-shadow: 0 0 60px rgba(196,30,42,0.08);
+        }
+    </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="overlay"><button id="startBtn">Begin</button></div>
+<script>
+'use strict';
+
+const canvas = document.getElementById('c');
+const gl = canvas.getContext('2d');
+
+// ─── 9:16 VERTICAL LAYOUT ───
+let W, H;
+function resize() {
+    const ratio = 9 / 16;
+    if (window.innerWidth / window.innerHeight > ratio) {
+        H = window.innerHeight;
+        W = H * ratio;
+    } else {
+        W = window.innerWidth;
+        H = W / ratio;
+    }
+    canvas.width = W;
+    canvas.height = H;
+    canvas.style.position = 'absolute';
+    canvas.style.left = ((window.innerWidth - W) / 2) + 'px';
+    canvas.style.top = ((window.innerHeight - H) / 2) + 'px';
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ─── TIMING — 8 scenes, ~28 seconds ───
+const S = [
+    { s: 0,    d: 3.5 },   // 0: Awakening — single point of light
+    { s: 3.5,  d: 4.0 },   // 1: Voice AI — orb + waveform visualization
+    { s: 7.5,  d: 4.0 },   // 2: Inbound/Outbound — dual waveform call flow
+    { s: 11.5, d: 4.0 },   // 3: Lead Gen — globe + connections
+    { s: 15.5, d: 3.5 },   // 4: Neural Intelligence — self-building brain
+    { s: 19.0, d: 4.5 },   // 5: Logo reveal
+    { s: 23.5, d: 4.5 },   // 6: Hold + fade
+];
+const TOTAL = 28;
+
+// ─── EASING ───
+function clamp(v) { return Math.max(0, Math.min(1, v)); }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function fade(t, start, dur) { return clamp((t - start) / dur); }
+function fadeO(t, start, dur) { return 1 - clamp((t - start) / dur); }
+function sp(t, i) { return clamp((t - S[i].s) / S[i].d); }
+function easeOut(t) { return 1 - Math.pow(1 - t, 4); }
+function easeInOut(t) { return t < 0.5 ? 8*t*t*t*t : 1 - Math.pow(-2*t+2, 4)/2; }
+// Apple-style spring easing
+function spring(t, damping) {
+    damping = damping || 0.6;
+    return 1 - Math.exp(-6 * t) * Math.cos(t * 12 * damping);
+}
+// Smooth step
+function smoothstep(a, b, t) {
+    const x = clamp((t - a) / (b - a));
+    return x * x * (3 - 2 * x);
+}
+
+// ─── AMBIENT PARTICLES — very subtle floating dust ───
+const PC = 600;
+const px = new Float32Array(PC), py = new Float32Array(PC);
+const pvx = new Float32Array(PC), pvy = new Float32Array(PC);
+const psz = new Float32Array(PC), pph = new Float32Array(PC);
+for (let i = 0; i < PC; i++) {
+    px[i] = Math.random(); py[i] = Math.random();
+    pvx[i] = (Math.random() - 0.5) * 0.00008;
+    pvy[i] = (Math.random() - 0.5) * 0.00008 - 0.00003; // slight upward drift
+    psz[i] = Math.random() * 0.8 + 0.2;
+    pph[i] = Math.random() * Math.PI * 2;
+}
+
+function drawDust(a) {
+    if (a < 0.01) return;
+    for (let i = 0; i < PC; i++) {
+        px[i] += pvx[i] + Math.sin(pph[i] + frame * 0.003) * 0.00002;
+        py[i] += pvy[i];
+        if (py[i] < -0.05) py[i] = 1.05;
+        if (py[i] > 1.05) py[i] = -0.05;
+        if (px[i] < -0.05) px[i] = 1.05;
+        if (px[i] > 1.05) px[i] = -0.05;
+        const sx = px[i] * W, sy = py[i] * H;
+        const shimmer = Math.sin(frame * 0.015 + pph[i]) * 0.4 + 0.6;
+        gl.beginPath();
+        gl.arc(sx, sy, psz[i] * 0.5, 0, Math.PI * 2);
+        gl.fillStyle = `rgba(245,245,247,${a * shimmer * 0.025 * psz[i]})`;
+        gl.fill();
+    }
+}
+
+// ─── SMOOTH TRANSITION — elegant fade through black ───
+function sceneAlpha(t, si) {
+    const lt = t - S[si].s;
+    const dur = S[si].d;
+    const fadeIn = smoothstep(0, 0.8, lt);
+    const fadeOut = 1 - smoothstep(dur - 0.8, dur, lt);
+    return fadeIn * fadeOut;
+}
+
+// ─── CONTINENT DATA ───
+const continentPts = [
+    [50,-120],[48,-123],[44,-124],[40,-122],[36,-120],[32,-117],[28,-110],[24,-105],
+    [30,-96],[34,-78],[38,-75],[42,-72],[46,-67],[48,-56],[52,-56],[55,-60],
+    [60,-140],[65,-140],[68,-150],[70,-160],[65,-168],[55,-162],
+    [45,-100],[42,-98],[40,-95],[38,-92],[45,-90],[48,-85],[50,-100],[52,-110],
+    [55,-120],[58,-130],[46,-105],[42,-105],[38,-100],[36,-96],[34,-92],
+    [12,-72],[7,-78],[2,-80],[-5,-80],[-10,-78],[-18,-72],[-24,-65],[-30,-62],
+    [-38,-57],[-46,-68],[-54,-68],[-52,-70],[-40,-65],[-34,-53],[-26,-48],
+    [-18,-40],[-8,-35],[-2,-44],[4,-54],[10,-64],
+    [-10,-55],[-15,-60],[-20,-55],[-25,-55],[-30,-55],[-15,-48],[-20,-50],
+    [60,12],[56,8],[52,5],[48,-5],[44,0],[40,-4],[36,-6],[38,2],[42,3],[46,8],
+    [50,6],[54,12],[58,14],[62,24],[66,14],[64,12],[68,16],[70,26],[58,22],
+    [50,15],[46,12],[42,8],[44,18],[48,18],[52,18],
+    [36,10],[30,10],[24,8],[18,2],[12,-4],[6,-2],[0,10],[-4,14],[-12,22],
+    [-20,32],[-26,32],[-34,26],[-32,18],[-26,18],[-18,14],[-10,8],[-4,10],
+    [36,36],[30,35],[24,38],[18,44],[12,48],[6,42],[0,38],[-6,30],[-12,20],
+    [10,20],[20,20],[0,25],[-10,25],[15,30],[25,25],[-20,28],[-28,22],
+    [70,60],[70,100],[70,140],[62,60],[56,45],[50,42],[44,50],[38,56],
+    [30,48],[24,55],[16,65],[8,80],[0,75],[-6,80],
+    [50,70],[50,90],[50,110],[45,65],[45,85],[45,105],[40,70],[40,90],
+    [35,70],[35,90],[35,110],[55,60],[55,80],[55,100],[60,80],[60,110],
+    [65,80],[65,120],[28,75],[22,82],[14,78],[42,132],[36,130],[44,140],
+    [-14,128],[-20,118],[-26,114],[-32,118],[-36,138],[-30,148],[-24,152],
+    [-18,146],[-12,140],[-16,132],[-20,124],
+    [-22,130],[-26,130],[-30,130],[-22,135],[-26,135],[-30,135],[-24,140],
+];
+
+// ─── NEURAL NETWORK — persistent nodes + connections ───
+const NN = 80;
+const nx = new Float32Array(NN), ny = new Float32Array(NN);
+const ntx = new Float32Array(NN), nty = new Float32Array(NN); // targets
+const nph = new Float32Array(NN);
+for (let i = 0; i < NN; i++) {
+    nx[i] = Math.random(); ny[i] = Math.random();
+    ntx[i] = 0.2 + Math.random() * 0.6;
+    nty[i] = 0.2 + Math.random() * 0.6;
+    nph[i] = Math.random() * Math.PI * 2;
+}
+// Pre-compute neural connections
+const nConns = [];
+for (let i = 0; i < NN; i++) {
+    for (let j = i + 1; j < NN; j++) {
+        const dx = ntx[i] - ntx[j], dy = nty[i] - nty[j];
+        if (Math.sqrt(dx*dx + dy*dy) < 0.22) {
+            nConns.push([i, j]);
+        }
+    }
+}
+
+// ─── AUDIO ENGINE ───
+let ac = null;
+function initAudio() { ac = new (window.AudioContext || window.webkitAudioContext)(); }
+
+function tone(t, f, d, v, type) {
+    if (!ac) return;
+    const o = ac.createOscillator(), g = ac.createGain();
+    const fl = ac.createBiquadFilter();
+    o.type = type || 'sine'; o.frequency.value = f;
+    fl.type = 'lowpass'; fl.frequency.value = 600;
+    const now = ac.currentTime + t;
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(v, now + d * 0.15);
+    g.gain.setValueAtTime(v * 0.8, now + d * 0.5);
+    g.gain.linearRampToValueAtTime(0, now + d);
+    o.connect(fl); fl.connect(g); g.connect(ac.destination);
+    o.start(now); o.stop(now + d);
+}
+
+function pad(t, d, f, v) {
+    if (!ac) return;
+    const o1 = ac.createOscillator(), o2 = ac.createOscillator(), g = ac.createGain();
+    const fl = ac.createBiquadFilter();
+    o1.type = 'sawtooth'; o1.frequency.value = f;
+    o2.type = 'sawtooth'; o2.frequency.value = f * 1.003;
+    fl.type = 'lowpass'; fl.frequency.value = 300; fl.Q.value = 1;
+    const now = ac.currentTime + t;
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(v, now + d * 0.35);
+    g.gain.linearRampToValueAtTime(v * 0.7, now + d * 0.7);
+    g.gain.linearRampToValueAtTime(0, now + d);
+    o1.connect(fl); o2.connect(fl); fl.connect(g); g.connect(ac.destination);
+    o1.start(now); o2.start(now); o1.stop(now + d); o2.stop(now + d);
+}
+
+function scheduleAudio() {
+    // Scene 0: Deep sub awakening
+    tone(0.5, 28, 3, 0.12);
+    pad(0, 3.5, 36, 0.04);
+
+    // Scene 1: Voice presence
+    pad(3.5, 4, 55, 0.06);
+    tone(4.0, 220, 0.8, 0.03);
+    tone(4.5, 260, 0.6, 0.02);
+    tone(5.2, 200, 1.0, 0.03);
+
+    // Scene 2: Dual call
+    pad(7.5, 4, 50, 0.05);
+    tone(8.0, 180, 0.6, 0.03);
+    tone(9.0, 240, 0.8, 0.03);
+    tone(10.0, 200, 0.5, 0.02);
+
+    // Scene 3: Globe tension
+    pad(11.5, 4, 38, 0.07);
+    tone(12, 30, 2, 0.08);
+
+    // Scene 4: Neural surge
+    pad(15.5, 3.5, 45, 0.06);
+    tone(16, 60, 1.5, 0.05);
+    tone(17, 80, 1, 0.04);
+
+    // Scene 5: Reveal
+    tone(19.0, 25, 3, 0.15);
+    pad(19, 4.5, 40, 0.08);
+    tone(19.5, 50, 2, 0.06);
+
+    // Scene 6: Fade
+    pad(23.5, 4, 30, 0.03);
+}
+
+// ─── STATE ───
+let startTime = 0;
+let frame = 0;
+let running = false;
+
+document.getElementById('startBtn').addEventListener('click', () => {
+    const ov = document.getElementById('overlay');
+    ov.style.opacity = '0';
+    setTimeout(() => ov.style.display = 'none', 800);
+    initAudio();
+    scheduleAudio();
+    startTime = performance.now() / 1000;
+    running = true;
+    requestAnimationFrame(render);
+});
+
+// ─── RENDER ───
+function render() {
+    if (!running) return;
+    const now = performance.now() / 1000;
+    const t = now - startTime;
+    frame++;
+
+    if (t > TOTAL + 1) { running = false; return; }
+
+    let scene = 0;
+    for (let i = S.length - 1; i >= 0; i--) {
+        if (t >= S[i].s) { scene = i; break; }
+    }
+
+    // Clear to true black
+    gl.fillStyle = '#000000';
+    gl.fillRect(0, 0, W, H);
+
+    // ═══════════════════════════════════════════
+    // SCENE 0 — AWAKENING: A single point of light is born
+    // ═══════════════════════════════════════════
+    if (scene === 0) {
+        const lt = t - S[0].s;
+        const a = sceneAlpha(t, 0);
+
+        // Total darkness for 0.8s, then a single point appears
+        const birthProgress = smoothstep(0.8, 2.0, lt);
+        const pointSize = birthProgress * 3;
+
+        // Outer glow — expands slowly, very subtle
+        if (birthProgress > 0) {
+            const glowR = birthProgress * W * 0.3;
+            const gg = gl.createRadialGradient(W/2, H/2, 0, W/2, H/2, glowR);
+            gg.addColorStop(0, `rgba(196,30,42,${a * birthProgress * 0.06})`);
+            gg.addColorStop(0.4, `rgba(120,20,30,${a * birthProgress * 0.02})`);
+            gg.addColorStop(1, 'rgba(0,0,0,0)');
+            gl.fillStyle = gg;
+            gl.fillRect(0, 0, W, H);
+
+            // The point itself — clean, precise
+            gl.beginPath();
+            gl.arc(W/2, H/2, pointSize, 0, Math.PI * 2);
+            gl.fillStyle = `rgba(245,245,247,${a * birthProgress * 0.9})`;
+            gl.fill();
+
+            // Inner red glow around point
+            const ig = gl.createRadialGradient(W/2, H/2, 0, W/2, H/2, pointSize * 8);
+            ig.addColorStop(0, `rgba(196,30,42,${a * birthProgress * 0.15})`);
+            ig.addColorStop(1, 'rgba(196,30,42,0)');
+            gl.fillStyle = ig;
+            gl.fillRect(W/2 - 40, H/2 - 40, 80, 80);
+        }
+
+        // Concentric pulse rings — one at a time, smooth expansion
+        const ringStart = 1.5;
+        for (let r = 0; r < 3; r++) {
+            const rAge = lt - ringStart - r * 0.5;
+            if (rAge < 0 || rAge > 1.5) continue;
+            const rProgress = easeOut(rAge / 1.5);
+            const rAlpha = (1 - rProgress) * a * 0.12;
+            const rRadius = rProgress * Math.min(W, H) * 0.35;
+            gl.beginPath();
+            gl.arc(W/2, H/2, rRadius, 0, Math.PI * 2);
+            gl.strokeStyle = `rgba(196,30,42,${rAlpha})`;
+            gl.lineWidth = 1.5 * (1 - rProgress);
+            gl.stroke();
+        }
+
+        // Minimal dust
+        drawDust(a * 0.4 * birthProgress);
+    }
+
+    // ═══════════════════════════════════════════
+    // SCENE 1 — VOICE AI: Living breathing voice orb
+    // Shows: 24/7 AI receptionist answering calls
+    // ═══════════════════════════════════════════
+    else if (scene === 1) {
+        const lt = t - S[1].s;
+        const a = sceneAlpha(t, 1);
+
+        drawDust(a * 0.3);
+
+        // Voice orb center — smooth, organic, alive
+        const orbY = H * 0.38;
+        const orbBaseR = W * 0.12;
+
+        // Simulated voice amplitude — organic speech pattern
+        const voice1 = Math.sin(lt * 4.2) * 0.4 + Math.sin(lt * 7.1) * 0.2 + Math.sin(lt * 11.3) * 0.1;
+        const voice2 = Math.sin(lt * 3.8 + 1) * 0.3 + Math.sin(lt * 8.5 + 2) * 0.15;
+        const speaking = smoothstep(0.5, 1.5, lt); // orb "wakes up"
+        const amp = Math.abs(voice1) * speaking;
+
+        // Orb glow layers — depth through multiple gradients
+        for (let layer = 3; layer >= 0; layer--) {
+            const layerR = orbBaseR * (1 + layer * 0.6) * (1 + amp * 0.15 * (3 - layer));
+            const layerA = a * [0.02, 0.03, 0.04, 0.08][layer] * (0.7 + amp * 0.3);
+            const gg = gl.createRadialGradient(W/2, orbY, 0, W/2, orbY, layerR);
+            gg.addColorStop(0, `rgba(196,30,42,${layerA})`);
+            gg.addColorStop(1, 'rgba(196,30,42,0)');
+            gl.fillStyle = gg;
+            gl.beginPath();
+            gl.arc(W/2, orbY, layerR, 0, Math.PI * 2);
+            gl.fill();
+        }
+
+        // Orb surface — smooth morphing circle using bezier curves
+        gl.beginPath();
+        const segments = 64;
+        for (let i = 0; i <= segments; i++) {
+            const angle = (i / segments) * Math.PI * 2;
+            const morphR = orbBaseR * (1 +
+                Math.sin(angle * 3 + lt * 4) * 0.03 * amp +
+                Math.sin(angle * 5 - lt * 6) * 0.02 * amp +
+                Math.sin(angle * 7 + lt * 3) * 0.015 * amp
+            );
+            const ox = W/2 + Math.cos(angle) * morphR;
+            const oy = orbY + Math.sin(angle) * morphR;
+            if (i === 0) gl.moveTo(ox, oy);
+            else gl.lineTo(ox, oy);
+        }
+        gl.closePath();
+        gl.strokeStyle = `rgba(196,30,42,${a * (0.2 + amp * 0.3)})`;
+        gl.lineWidth = 1.5;
+        gl.stroke();
+
+        // Inner orb fill — very subtle
+        const orbFill = gl.createRadialGradient(W/2, orbY, 0, W/2, orbY, orbBaseR);
+        orbFill.addColorStop(0, `rgba(196,30,42,${a * 0.06 * (0.5 + amp * 0.5)})`);
+        orbFill.addColorStop(0.7, `rgba(196,30,42,${a * 0.02})`);
+        orbFill.addColorStop(1, 'rgba(196,30,42,0)');
+        gl.fillStyle = orbFill;
+        gl.fill();
+
+        // Concentric ripples — voice propagating outward
+        for (let r = 0; r < 5; r++) {
+            const rippleT = (lt * 1.2 + r * 0.8) % 4;
+            if (rippleT > 2.5) continue;
+            const rippleP = rippleT / 2.5;
+            const rippleR = orbBaseR * (1.2 + rippleP * 2.5);
+            const rippleA = (1 - rippleP) * a * 0.06 * speaking;
+            gl.beginPath();
+            gl.arc(W/2, orbY, rippleR, 0, Math.PI * 2);
+            gl.strokeStyle = `rgba(196,30,42,${rippleA})`;
+            gl.lineWidth = 0.8 * (1 - rippleP);
+            gl.stroke();
+        }
+
+        // Voice waveform below orb — flowing, elegant
+        const waveY = H * 0.58;
+        const waveW = W * 0.7;
+        const waveStartX = (W - waveW) / 2;
+        const waveA = smoothstep(1, 2, lt) * a;
+
+        if (waveA > 0.01) {
+            gl.beginPath();
+            for (let i = 0; i <= 200; i++) {
+                const p = i / 200;
+                const wx = waveStartX + p * waveW;
+                // Organic multi-frequency waveform
+                const env = Math.sin(p * Math.PI); // fade at edges
+                const wave = (
+                    Math.sin(p * 12 + lt * 5) * 0.4 +
+                    Math.sin(p * 18 - lt * 7) * 0.25 +
+                    Math.sin(p * 8 + lt * 3) * 0.15 +
+                    Math.sin(p * 25 + lt * 9) * 0.1
+                ) * env * amp * H * 0.04;
+                const wy = waveY + wave;
+                if (i === 0) gl.moveTo(wx, wy);
+                else gl.lineTo(wx, wy);
+            }
+            gl.strokeStyle = `rgba(196,30,42,${waveA * 0.35})`;
+            gl.lineWidth = 1.5;
+            gl.stroke();
+
+            // Waveform glow
+            gl.shadowColor = 'rgba(196,30,42,0.15)';
+            gl.shadowBlur = 12;
+            gl.stroke();
+            gl.shadowBlur = 0;
+
+            // Second, fainter harmonic line
+            gl.beginPath();
+            for (let i = 0; i <= 200; i++) {
+                const p = i / 200;
+                const wx = waveStartX + p * waveW;
+                const env = Math.sin(p * Math.PI);
+                const wave = (
+                    Math.sin(p * 15 - lt * 4) * 0.3 +
+                    Math.sin(p * 22 + lt * 6) * 0.2
+                ) * env * amp * H * 0.025;
+                const wy = waveY + wave;
+                if (i === 0) gl.moveTo(wx, wy);
+                else gl.lineTo(wx, wy);
+            }
+            gl.strokeStyle = `rgba(196,30,42,${waveA * 0.12})`;
+            gl.lineWidth = 1;
+            gl.stroke();
+        }
+
+        // Minimal label — appears late, understated
+        const labelA = smoothstep(2.8, 3.5, lt) * a;
+        if (labelA > 0.01) {
+            gl.font = `300 ${Math.floor(W * 0.025)}px Inter, sans-serif`;
+            gl.textAlign = 'center';
+            gl.fillStyle = `rgba(245,245,247,${labelA * 0.25})`;
+            gl.fillText('24 / 7', W/2, H * 0.75);
+        }
+    }
+
+    // ═══════════════════════════════════════════
+    // SCENE 2 — INBOUND / OUTBOUND: Dual waveform call flow
+    // Shows: Two AI voices connecting, calls flowing both ways
+    // ═══════════════════════════════════════════
+    else if (scene === 2) {
+        const lt = t - S[2].s;
+        const a = sceneAlpha(t, 2);
+
+        drawDust(a * 0.25);
+
+        const cx = W / 2;
+
+        // Two orbs — one top (inbound), one bottom (outbound)
+        const orb1Y = H * 0.28;
+        const orb2Y = H * 0.62;
+        const orbR = W * 0.06;
+
+        // Inbound orb appears first
+        const inA = smoothstep(0.2, 0.8, lt) * a;
+        const inVoice = Math.abs(Math.sin(lt * 5.5) * 0.5 + Math.sin(lt * 9.2) * 0.2) * smoothstep(0.5, 1.2, lt);
+
+        // Outbound orb appears second
+        const outA = smoothstep(0.8, 1.4, lt) * a;
+        const outVoice = Math.abs(Math.sin(lt * 4.8 + 2) * 0.4 + Math.sin(lt * 8.1 + 1) * 0.25) * smoothstep(1.2, 1.8, lt);
+
+        // Draw orbs
+        [
+            { y: orb1Y, alpha: inA, voice: inVoice, hue: [196,30,42] },
+            { y: orb2Y, alpha: outA, voice: outVoice, hue: [196,30,42] }
+        ].forEach(orb => {
+            const r = orbR * (1 + orb.voice * 0.2);
+            // Glow
+            const gg = gl.createRadialGradient(cx, orb.y, 0, cx, orb.y, r * 4);
+            gg.addColorStop(0, `rgba(${orb.hue},${orb.alpha * 0.08 * (0.6 + orb.voice * 0.4)})`);
+            gg.addColorStop(1, `rgba(${orb.hue},0)`);
+            gl.fillStyle = gg;
+            gl.beginPath(); gl.arc(cx, orb.y, r * 4, 0, Math.PI * 2); gl.fill();
+
+            // Ring
+            gl.beginPath();
+            const segs = 48;
+            for (let i = 0; i <= segs; i++) {
+                const ang = (i / segs) * Math.PI * 2;
+                const mr = r * (1 + Math.sin(ang * 4 + lt * 5) * 0.04 * orb.voice);
+                const ox2 = cx + Math.cos(ang) * mr;
+                const oy2 = orb.y + Math.sin(ang) * mr;
+                if (i === 0) gl.moveTo(ox2, oy2); else gl.lineTo(ox2, oy2);
+            }
+            gl.closePath();
+            gl.strokeStyle = `rgba(${orb.hue},${orb.alpha * (0.15 + orb.voice * 0.25)})`;
+            gl.lineWidth = 1;
+            gl.stroke();
+
+            // Ripples
+            for (let rr = 0; rr < 3; rr++) {
+                const rt = (lt * 1.5 + rr * 1) % 3;
+                if (rt > 2) continue;
+                const rp = rt / 2;
+                gl.beginPath();
+                gl.arc(cx, orb.y, r * (1.3 + rp * 2), 0, Math.PI * 2);
+                gl.strokeStyle = `rgba(${orb.hue},${(1-rp) * orb.alpha * 0.04})`;
+                gl.lineWidth = 0.6 * (1 - rp);
+                gl.stroke();
+            }
+        });
+
+        // Connecting flow between orbs — data stream particles
+        const connA = smoothstep(1.5, 2.5, lt) * a;
+        if (connA > 0.01) {
+            // Flowing line
+            gl.beginPath();
+            gl.moveTo(cx, orb1Y + orbR * 1.5);
+            gl.lineTo(cx, orb2Y - orbR * 1.5);
+            gl.strokeStyle = `rgba(196,30,42,${connA * 0.04})`;
+            gl.lineWidth = 0.5;
+            gl.stroke();
+
+            // Particles flowing down (inbound → process)
+            for (let i = 0; i < 8; i++) {
+                const flowP = ((lt * 0.8 + i * 0.12) % 1);
+                const fy = lerp(orb1Y + orbR * 1.5, orb2Y - orbR * 1.5, flowP);
+                const fx = cx + Math.sin(flowP * Math.PI * 3 + i * 2) * 4;
+                const fAlpha = Math.sin(flowP * Math.PI) * connA;
+                gl.beginPath(); gl.arc(fx, fy, 1.5, 0, Math.PI * 2);
+                gl.fillStyle = `rgba(196,30,42,${fAlpha * 0.3})`;
+                gl.fill();
+            }
+
+            // Particles flowing up (process → outbound)
+            for (let i = 0; i < 6; i++) {
+                const flowP = ((lt * 0.6 + i * 0.15 + 0.5) % 1);
+                const fy = lerp(orb2Y - orbR * 1.5, orb1Y + orbR * 1.5, flowP);
+                const fx = cx + Math.sin(flowP * Math.PI * 2.5 + i * 3) * 3;
+                const fAlpha = Math.sin(flowP * Math.PI) * connA;
+                gl.beginPath(); gl.arc(fx, fy, 1, 0, Math.PI * 2);
+                gl.fillStyle = `rgba(245,245,247,${fAlpha * 0.15})`;
+                gl.fill();
+            }
+        }
+
+        // Horizontal waveform snippets next to each orb
+        const snippetW = W * 0.25;
+        [[orb1Y, inA, inVoice, -1], [orb2Y, outA, outVoice, 1]].forEach(([oy, oa, ov, dir]) => {
+            if (oa < 0.05) return;
+            const sx = cx + dir * (orbR * 2.5);
+            gl.beginPath();
+            for (let i = 0; i <= 80; i++) {
+                const p2 = i / 80;
+                const wx = sx + dir * p2 * snippetW;
+                const env = Math.sin(p2 * Math.PI);
+                const wave = Math.sin(p2 * 14 + lt * 6 * dir) * env * ov * 8;
+                if (i === 0) gl.moveTo(wx, oy + wave);
+                else gl.lineTo(wx, oy + wave);
+            }
+            gl.strokeStyle = `rgba(196,30,42,${oa * 0.15})`;
+            gl.lineWidth = 1;
+            gl.stroke();
+        });
+
+        // Labels — quiet, minimal
+        const lA = smoothstep(2.5, 3.2, lt) * a;
+        gl.font = `200 ${Math.floor(W * 0.022)}px Inter, sans-serif`;
+        gl.textAlign = 'center';
+        gl.fillStyle = `rgba(245,245,247,${lA * 0.2})`;
+        gl.fillText('INBOUND', cx, orb1Y - orbR * 2.2);
+        gl.fillText('OUTBOUND', cx, orb2Y + orbR * 2.8);
+    }
+
+    // ═══════════════════════════════════════════
+    // SCENE 3 — LEAD GEN: Globe with connection arcs lighting up
+    // Shows: Worldwide reach, leads connecting across the planet
+    // ═══════════════════════════════════════════
+    else if (scene === 3) {
+        const lt = t - S[3].s;
+        const a = sceneAlpha(t, 3);
+
+        const globeR = Math.min(W, H) * 0.22;
+        const gCx = W * 0.5, gCy = H * 0.4;
+        const rot = lt * 0.2;
+        const globeA = smoothstep(0, 1.2, lt) * a;
+
+        drawDust(a * 0.2);
+
+        // Atmospheric glow behind globe
+        const atmos = gl.createRadialGradient(gCx, gCy, globeR * 0.5, gCx, gCy, globeR * 2);
+        atmos.addColorStop(0, `rgba(196,30,42,${globeA * 0.04})`);
+        atmos.addColorStop(0.5, `rgba(100,15,20,${globeA * 0.015})`);
+        atmos.addColorStop(1, 'rgba(0,0,0,0)');
+        gl.fillStyle = atmos;
+        gl.fillRect(0, 0, W, H);
+
+        // Globe edge — clean circle
+        gl.beginPath();
+        gl.arc(gCx, gCy, globeR, 0, Math.PI * 2);
+        gl.strokeStyle = `rgba(196,30,42,${globeA * 0.08})`;
+        gl.lineWidth = 0.5;
+        gl.stroke();
+
+        // Continent dot cloud
+        const degR = Math.PI / 180;
+        for (let i = 0; i < continentPts.length; i++) {
+            const [latD, lonD] = continentPts[i];
+            const laR = latD * degR, loR = lonD * degR + rot;
+            const cL = Math.cos(laR);
+            const x3 = cL * Math.sin(loR), y3 = -Math.sin(laR), z3 = cL * Math.cos(loR);
+            if (z3 < -0.05) continue;
+            const sx = gCx + x3 * globeR, sy = gCy + y3 * globeR;
+            const da = 0.15 + z3 * 0.85;
+            const ds = 0.6 + z3 * 0.8;
+            gl.beginPath(); gl.arc(sx, sy, ds, 0, Math.PI * 2);
+            gl.fillStyle = `rgba(196,30,42,${globeA * da * 0.55})`;
+            gl.fill();
+        }
+
+        // City nodes that light up with spring easing
+        const cities = [
+            { lat: 40.7, lon: -74, delay: 0.5 },   // NYC
+            { lat: 51.5, lon: 0, delay: 0.9 },      // London
+            { lat: 35.7, lon: 139.7, delay: 1.3 },   // Tokyo
+            { lat: 25.2, lon: 55.3, delay: 1.7 },     // Dubai
+            { lat: -33.9, lon: 151.2, delay: 2.0 },   // Sydney
+            { lat: 19.4, lon: -99.1, delay: 2.3 },    // Mexico City
+            { lat: -23.5, lon: -46.6, delay: 2.5 },   // Sao Paulo
+            { lat: 1.3, lon: 103.8, delay: 2.7 },     // Singapore
+        ];
+
+        const visibleCities = [];
+        cities.forEach((city, ci) => {
+            const born = smoothstep(city.delay, city.delay + 0.4, lt);
+            if (born < 0.01) return;
+            const laR2 = city.lat * degR, loR2 = city.lon * degR + rot;
+            const cL2 = Math.cos(laR2);
+            const x4 = cL2 * Math.sin(loR2), y4 = -Math.sin(laR2), z4 = cL2 * Math.cos(loR2);
+            if (z4 < -0.1) return;
+            const faceA = clamp((z4 + 0.1) * 3);
+            const sx2 = gCx + x4 * globeR, sy2 = gCy + y4 * globeR;
+            const dotA = globeA * faceA * born;
+
+            visibleCities.push({ x: sx2, y: sy2, a: dotA, ci: ci });
+
+            // City glow — soft radial
+            const cg = gl.createRadialGradient(sx2, sy2, 0, sx2, sy2, 12);
+            cg.addColorStop(0, `rgba(196,30,42,${dotA * 0.2})`);
+            cg.addColorStop(1, 'rgba(196,30,42,0)');
+            gl.fillStyle = cg;
+            gl.fillRect(sx2 - 12, sy2 - 12, 24, 24);
+
+            // City dot — spring scale
+            const springScale = spring(born) * 2.5;
+            gl.beginPath(); gl.arc(sx2, sy2, springScale, 0, Math.PI * 2);
+            gl.fillStyle = `rgba(245,245,247,${dotA * 0.7})`;
+            gl.fill();
+
+            // Arrival ring
+            if (born < 0.8) {
+                const ringR = born * 15;
+                gl.beginPath(); gl.arc(sx2, sy2, ringR, 0, Math.PI * 2);
+                gl.strokeStyle = `rgba(196,30,42,${(1 - born) * dotA * 0.3})`;
+                gl.lineWidth = 0.5;
+                gl.stroke();
+            }
+        });
+
+        // Connection arcs between visible cities — smooth bezier
+        for (let i = 0; i < visibleCities.length; i++) {
+            for (let j = i + 1; j < visibleCities.length; j++) {
+                const c1 = visibleCities[i], c2 = visibleCities[j];
+                if (c1.a < 0.05 || c2.a < 0.05) continue;
+                const connBorn = smoothstep(cities[c2.ci].delay + 0.3, cities[c2.ci].delay + 0.8, lt);
+                if (connBorn < 0.01) continue;
+                const arcA = Math.min(c1.a, c2.a) * connBorn * 0.06;
+                const mx = (c1.x + c2.x) / 2;
+                const my = (c1.y + c2.y) / 2 - 15;
+                gl.beginPath();
+                gl.moveTo(c1.x, c1.y);
+                gl.quadraticCurveTo(mx, my, c2.x, c2.y);
+                gl.strokeStyle = `rgba(196,30,42,${arcA})`;
+                gl.lineWidth = 0.5;
+                gl.stroke();
+
+                // Traveling pulse
+                const pp = (lt * 0.4 + i * 0.2 + j * 0.15) % 1;
+                const ppx = lerp(lerp(c1.x,mx,pp), lerp(mx,c2.x,pp), pp);
+                const ppy = lerp(lerp(c1.y,my,pp), lerp(my,c2.y,pp), pp);
+                gl.beginPath(); gl.arc(ppx, ppy, 1.5, 0, Math.PI * 2);
+                gl.fillStyle = `rgba(196,30,42,${arcA * 4})`;
+                gl.fill();
+            }
+        }
+
+        // Counter below globe — clean, Apple-style counting animation
+        const counterA = smoothstep(2, 2.8, lt) * a;
+        if (counterA > 0.01) {
+            const count = Math.floor(easeOut(clamp((lt - 2) / 1.5)) * 14847);
+            gl.font = `200 ${Math.floor(W * 0.08)}px Inter, sans-serif`;
+            gl.textAlign = 'center';
+            gl.textBaseline = 'middle';
+            gl.fillStyle = `rgba(245,245,247,${counterA * 0.7})`;
+            gl.fillText(count.toLocaleString(), W/2, H * 0.72);
+
+            gl.font = `300 ${Math.floor(W * 0.022)}px Inter, sans-serif`;
+            gl.fillStyle = `rgba(196,30,42,${counterA * 0.3})`;
+            gl.fillText('LEADS CAPTURED', W/2, H * 0.72 + W * 0.06);
+        }
+    }
+
+    // ═══════════════════════════════════════════
+    // SCENE 4 — NEURAL INTELLIGENCE: Self-building brain
+    // Shows: Autonomous optimization, AI thinking
+    // ═══════════════════════════════════════════
+    else if (scene === 4) {
+        const lt = t - S[4].s;
+        const a = sceneAlpha(t, 4);
+
+        drawDust(a * 0.2);
+
+        // Neural nodes converge toward their positions
+        const convergence = smoothstep(0, 2, lt);
+
+        for (let i = 0; i < NN; i++) {
+            // Animate from scattered to organized
+            nx[i] = lerp(nx[i], ntx[i], convergence * 0.08);
+            ny[i] = lerp(ny[i], nty[i], convergence * 0.08);
+        }
+
+        // Draw connections first (behind nodes)
+        const connProgress = smoothstep(0.8, 2.5, lt);
+        const activeConns = Math.floor(connProgress * nConns.length);
+
+        for (let c = 0; c < activeConns; c++) {
+            const [i, j] = nConns[c];
+            const x1 = nx[i] * W, y1 = ny[i] * H;
+            const x2 = nx[j] * W, y2 = ny[j] * H;
+
+            // Synaptic firing — cascading pulse
+            const firePhase = (lt * 2 + c * 0.15) % 3;
+            const firing = firePhase < 0.3 ? Math.sin((firePhase / 0.3) * Math.PI) : 0;
+
+            const lineA = a * (0.03 + firing * 0.12) * connProgress;
+            gl.beginPath();
+            gl.moveTo(x1, y1);
+            gl.lineTo(x2, y2);
+            gl.strokeStyle = `rgba(196,30,42,${lineA})`;
+            gl.lineWidth = 0.5 + firing * 1;
+            gl.stroke();
+
+            // Pulse traveling along connection
+            if (firing > 0.1) {
+                const pulseP = firePhase / 0.3;
+                const ppx = lerp(x1, x2, pulseP);
+                const ppy = lerp(y1, y2, pulseP);
+                gl.beginPath(); gl.arc(ppx, ppy, 2 + firing * 2, 0, Math.PI * 2);
+                gl.fillStyle = `rgba(196,30,42,${a * firing * 0.3})`;
+                gl.fill();
+            }
+        }
+
+        // Draw nodes
+        const nodeProgress = smoothstep(0.2, 1.5, lt);
+        for (let i = 0; i < NN; i++) {
+            const born = smoothstep(i / NN * 1.2, i / NN * 1.2 + 0.3, lt);
+            if (born < 0.01) continue;
+            const sx = nx[i] * W, sy = ny[i] * H;
+            const pulse = Math.sin(lt * 3 + nph[i]) * 0.3 + 0.7;
+            const nodeA = a * born * nodeProgress;
+            const nodeR = spring(born) * (1.5 + psz[i % PC] * 0.8) * pulse;
+
+            // Node glow
+            const ng = gl.createRadialGradient(sx, sy, 0, sx, sy, nodeR * 5);
+            ng.addColorStop(0, `rgba(196,30,42,${nodeA * 0.06})`);
+            ng.addColorStop(1, 'rgba(196,30,42,0)');
+            gl.fillStyle = ng;
+            gl.fillRect(sx - nodeR*5, sy - nodeR*5, nodeR*10, nodeR*10);
+
+            // Node dot
+            gl.beginPath(); gl.arc(sx, sy, nodeR, 0, Math.PI * 2);
+            gl.fillStyle = i % 6 === 0
+                ? `rgba(245,245,247,${nodeA * 0.5 * pulse})`
+                : `rgba(196,30,42,${nodeA * 0.35 * pulse})`;
+            gl.fill();
+        }
+
+        // Cascade wave visualization — light sweeps through the network
+        const waveT = (lt * 0.7) % 2;
+        if (waveT < 1) {
+            const waveFront = waveT;
+            for (let i = 0; i < NN; i++) {
+                const dist = Math.abs(nx[i] - waveFront);
+                if (dist < 0.08) {
+                    const intensity = (1 - dist / 0.08) * a * 0.15;
+                    const sx = nx[i] * W, sy = ny[i] * H;
+                    gl.beginPath(); gl.arc(sx, sy, 6, 0, Math.PI * 2);
+                    gl.fillStyle = `rgba(196,30,42,${intensity})`;
+                    gl.fill();
+                }
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════
+    // SCENE 5 — REVEAL: ADRECTIVE.AI materializes
+    // ═══════════════════════════════════════════
+    else if (scene === 5) {
+        const lt = t - S[5].s;
+        const a = sceneAlpha(t, 5);
+
+        drawDust(a * 0.3);
+
+        // Background energy builds
+        const buildA = smoothstep(0, 1.5, lt) * a;
+        const bg = gl.createRadialGradient(W/2, H * 0.44, 0, W/2, H * 0.44, W * 0.6);
+        bg.addColorStop(0, `rgba(196,30,42,${buildA * 0.04})`);
+        bg.addColorStop(0.5, `rgba(100,15,20,${buildA * 0.015})`);
+        bg.addColorStop(1, 'rgba(0,0,0,0)');
+        gl.fillStyle = bg;
+        gl.fillRect(0, 0, W, H);
+
+        // Logo reveal — letters fade in with spring easing, not slam
+        const logoSize = Math.floor(W * 0.085);
+        const logoY = H * 0.44;
+
+        gl.font = `700 ${logoSize}px Orbitron, sans-serif`;
+        gl.textAlign = 'left';
+        gl.textBaseline = 'middle';
+        const adrW = gl.measureText('ADRECTIVE').width;
+        const dotAiW = gl.measureText('.AI').width;
+        const fullW = adrW + dotAiW;
+        const startX = W / 2 - fullW / 2;
+
+        const text = 'ADRECTIVE.AI';
+        const dotIdx = text.indexOf('.');
+
+        // Each letter fades in with slight delay — Apple-style stagger
+        for (let i = 0; i < text.length; i++) {
+            const charDelay = 0.6 + i * 0.08;
+            const charProgress = smoothstep(charDelay, charDelay + 0.4, lt);
+            if (charProgress < 0.01) continue;
+
+            const charA = a * charProgress;
+            // Slight upward motion as it appears
+            const yOff = (1 - easeOut(charProgress)) * 8;
+
+            gl.font = `700 ${logoSize}px Orbitron, sans-serif`;
+            gl.textAlign = 'left';
+            gl.textBaseline = 'middle';
+
+            // Measure position
+            const prefix = text.substring(0, i);
+            const charX = startX + gl.measureText(prefix).width;
+
+            // Color: white for ADRECTIVE, red for .AI
+            if (i >= dotIdx) {
+                gl.fillStyle = `rgba(196,30,42,${charA * 0.95})`;
+            } else {
+                gl.fillStyle = `rgba(245,245,247,${charA * 0.9})`;
+            }
+            gl.fillText(text[i], charX, logoY + yOff);
+
+            // Subtle per-character glow on arrival
+            if (charProgress < 0.6) {
+                const glowA = (1 - charProgress / 0.6) * charA * 0.08;
+                const cw = gl.measureText(text[i]).width;
+                const cCx = charX + cw / 2;
+                const cg = gl.createRadialGradient(cCx, logoY, 0, cCx, logoY, logoSize * 0.8);
+                cg.addColorStop(0, `rgba(196,30,42,${glowA})`);
+                cg.addColorStop(1, 'rgba(196,30,42,0)');
+                gl.fillStyle = cg;
+                gl.fillRect(cCx - logoSize, logoY - logoSize, logoSize * 2, logoSize * 2);
+            }
+        }
+
+        // Underline — draws itself from center outward
+        const lineStart = 0.6 + text.length * 0.08 + 0.5;
+        const lineP = smoothstep(lineStart, lineStart + 0.8, lt);
+        if (lineP > 0.01) {
+            const lineW = fullW * 0.4 * lineP;
+            const lineY = logoY + logoSize * 0.6;
+            const lineGrad = gl.createLinearGradient(W/2 - lineW/2, 0, W/2 + lineW/2, 0);
+            lineGrad.addColorStop(0, 'rgba(196,30,42,0)');
+            lineGrad.addColorStop(0.2, `rgba(196,30,42,${a * lineP * 0.25})`);
+            lineGrad.addColorStop(0.8, `rgba(196,30,42,${a * lineP * 0.25})`);
+            lineGrad.addColorStop(1, 'rgba(196,30,42,0)');
+            gl.fillStyle = lineGrad;
+            gl.fillRect(W/2 - lineW/2, lineY, lineW, 1);
+        }
+
+        // Tagline — fades in after logo is complete
+        const tagDelay = lineStart + 0.8;
+        const tagA = smoothstep(tagDelay, tagDelay + 0.8, lt) * a;
+        if (tagA > 0.01) {
+            const tagSize = Math.floor(logoSize * 0.22);
+            gl.font = `300 ${tagSize}px Inter, sans-serif`;
+            gl.textAlign = 'center';
+            gl.textBaseline = 'middle';
+            // Slight upward float
+            const tagYOff = (1 - easeOut(clamp((lt - tagDelay) / 0.8))) * 6;
+            gl.fillStyle = `rgba(245,245,247,${tagA * 0.35})`;
+            gl.fillText('AUTONOMOUS GROWTH. ENGINEERED.', W/2, logoY + logoSize * 1.2 + tagYOff);
+        }
+
+        // Single elegant pulse ring at logo completion
+        const pulseStart = lineStart + 0.3;
+        const pulseAge = lt - pulseStart;
+        if (pulseAge > 0 && pulseAge < 1.5) {
+            const pulseP = easeOut(pulseAge / 1.5);
+            const pulseR = pulseP * W * 0.4;
+            const pulseA = (1 - pulseP) * a * 0.06;
+            gl.beginPath(); gl.arc(W/2, logoY, pulseR, 0, Math.PI * 2);
+            gl.strokeStyle = `rgba(196,30,42,${pulseA})`;
+            gl.lineWidth = 1 * (1 - pulseP);
+            gl.stroke();
+        }
+    }
+
+    // ═══════════════════════════════════════════
+    // SCENE 6 — HOLD + FADE: Logo breathes, then darkness
+    // ═══════════════════════════════════════════
+    else if (scene === 6) {
+        const lt = t - S[6].s;
+        const holdA = (1 - smoothstep(1.5, 4, lt));
+        const a = holdA;
+
+        drawDust(a * 0.2);
+
+        // Logo holds
+        const logoSize = Math.floor(W * 0.085);
+        const logoY = H * 0.44;
+        const breathe = Math.sin(lt * 1.8) * 0.15 + 0.85;
+
+        gl.font = `700 ${logoSize}px Orbitron, sans-serif`;
+        gl.textAlign = 'left';
+        gl.textBaseline = 'middle';
+        const adrW = gl.measureText('ADRECTIVE').width;
+        const dotAiW = gl.measureText('.AI').width;
+        const fullW = adrW + dotAiW;
+        const startX2 = W / 2 - fullW / 2;
+
+        // Breathing glow
+        const bg = gl.createRadialGradient(W/2, logoY, 0, W/2, logoY, fullW * 0.5);
+        bg.addColorStop(0, `rgba(196,30,42,${a * 0.04 * breathe})`);
+        bg.addColorStop(1, 'rgba(0,0,0,0)');
+        gl.fillStyle = bg;
+        gl.fillRect(0, 0, W, H);
+
+        gl.fillStyle = `rgba(245,245,247,${a * 0.9})`;
+        gl.fillText('ADRECTIVE', startX2, logoY);
+        gl.fillStyle = `rgba(196,30,42,${a * 0.95})`;
+        gl.fillText('.AI', startX2 + adrW, logoY);
+
+        // Underline
+        const lineW2 = fullW * 0.4;
+        const lineGrad2 = gl.createLinearGradient(W/2 - lineW2/2, 0, W/2 + lineW2/2, 0);
+        lineGrad2.addColorStop(0, 'rgba(196,30,42,0)');
+        lineGrad2.addColorStop(0.2, `rgba(196,30,42,${a * 0.25})`);
+        lineGrad2.addColorStop(0.8, `rgba(196,30,42,${a * 0.25})`);
+        lineGrad2.addColorStop(1, 'rgba(196,30,42,0)');
+        gl.fillStyle = lineGrad2;
+        gl.fillRect(W/2 - lineW2/2, logoY + logoSize * 0.6, lineW2, 1);
+
+        // Tagline
+        const tagSize = Math.floor(logoSize * 0.22);
+        gl.font = `300 ${tagSize}px Inter, sans-serif`;
+        gl.textAlign = 'center';
+        gl.fillStyle = `rgba(245,245,247,${a * 0.3})`;
+        gl.fillText('AUTONOMOUS GROWTH. ENGINEERED.', W/2, logoY + logoSize * 1.2);
+
+        // Founder credit
+        const creditA = a * smoothstep(0.5, 1.5, lt) * (1 - smoothstep(2.5, 3.5, lt));
+        if (creditA > 0.01) {
+            gl.font = `200 ${Math.floor(W * 0.02)}px Inter, sans-serif`;
+            gl.fillStyle = `rgba(150,150,150,${creditA * 0.25})`;
+            gl.fillText('FOUNDED BY JACQUES LEV', W/2, H * 0.72);
+        }
+
+        // Final fade to black
+        const blackA = smoothstep(2.5, 4.2, lt);
+        gl.fillStyle = `rgba(0,0,0,${blackA})`;
+        gl.fillRect(0, 0, W, H);
+    }
+
+    // ─── GLOBAL VIGNETTE — elegant, not heavy ───
+    const vg = gl.createRadialGradient(W/2, H/2, W * 0.2, W/2, H/2, H * 0.65);
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, 'rgba(0,0,0,0.4)');
+    gl.fillStyle = vg;
+    gl.fillRect(0, 0, W, H);
+
+    requestAnimationFrame(render);
+}
+
+</script>
+</body>
+</html>
